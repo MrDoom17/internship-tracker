@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internship Tracker</title>
+<style>
+:root {
+  --bg: #f4f5f8; --surface: #ffffff; --surface-2: #f8f9fb; --fg: #0f172a; --muted: #64748b;
+  --line: #e6e8ee; --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0ff; --on-accent: #ffffff;
+  --new: #4f46e5; --sel: #eef0ff; --ok: #15803d; --danger: #b91c1c;
+  --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 6px 20px rgba(15, 23, 42, .06);
+  --pill-l: 36%; --pill-a: .12;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1014; --surface: #171a21; --surface-2: #1d2129; --fg: #e8eaf0; --muted: #8e97aa;
+    --line: #272c37; --accent: #6366f1; --accent-hover: #7c7ff5; --accent-soft: #23264a; --on-accent: #ffffff;
+    --new: #8b8ff8; --sel: #20244a; --ok: #4ade80; --danger: #f87171;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
+    --pill-l: 76%; --pill-a: .16;
+  }
+}
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body { margin: 0; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased;
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.page { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+
+/* top bar */
+.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid transparent; }
+.top.scrolled { border-bottom-color: var(--line); }
+.top-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+.logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: grid; place-items: center; color: #fff; }
+.badge { background: var(--accent-soft); color: var(--new); font-weight: 650; font-size: 12.5px;
+  padding: 3px 9px; border-radius: 999px; }
+.grow { flex: 1; }
+#status { color: var(--muted); font-size: 13px; text-align: right; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 10px;
+  font-weight: 550; font-size: 14px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  transition: background .12s, border-color .12s, transform .05s; }
+.btn:hover { background: var(--surface-2); border-color: color-mix(in srgb, var(--muted) 45%, var(--line)); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--fg); }
+.btn.icon { padding: 8px; }
+.btn:disabled { opacity: .6; cursor: default; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2s; } * { transition: none !important; } }
+
+/* search */
+.search { margin-top: 10px; display: flex; align-items: center; gap: 10px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 6px 14px; box-shadow: var(--shadow); }
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.search svg { color: var(--muted); flex: none; }
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; padding: 8px 0; }
+.search input::placeholder { color: var(--muted); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 7px 4px 0; }
+.hint code { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: 12px; }
+
+/* field chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 12px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px;
+  font-size: 13.5px; font-weight: 550; display: inline-flex; align-items: center; gap: 7px; }
+.chip:hover { border-color: color-mix(in srgb, var(--muted) 50%, var(--line)); }
+.chip .n { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--h) 70% 52%); }
+.chip.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip.on .n { color: inherit; opacity: .7; }
+
+/* filter row */
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 14px; }
+.f { display: flex; flex-direction: column; gap: 4px; }
+.f span { font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding-left: 2px; }
+.f input, .f select, .field input, .field textarea { background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 11px; outline: 0; width: 152px; }
+.f select { width: 160px; }
+.f input:focus, .f select:focus, .field input:focus, .field textarea:focus { border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+#count { color: var(--muted); font-size: 13.5px; margin-left: auto; padding-bottom: 9px; font-variant-numeric: tabular-nums; }
+
+/* list */
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 13px 18px; border-bottom: 1px solid var(--line); cursor: default; }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--surface-2); }
+.row.sel { background: var(--sel); }
+.mark { width: 8px; height: 8px; border-radius: 50%; }
+.row.new .mark { background: var(--new); box-shadow: 0 0 0 3px color-mix(in srgb, var(--new) 22%, transparent); }
+.title { font-weight: 600; font-size: 15.5px; letter-spacing: -.005em; color: inherit; text-decoration: none;
+  display: inline; }
+.title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.row.new .title { font-weight: 700; }
+.row.seen .title { font-weight: 550; }
+.row.hidden .title, .row.hidden .sub { color: var(--muted); }
+.sub { color: var(--muted); font-size: 13.5px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub b { color: var(--fg); font-weight: 550; opacity: .86; }
+.meta { display: flex; align-items: center; gap: 10px; }
+.pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  color: hsl(var(--h) 62% var(--pill-l)); background: hsl(var(--h) 80% 50% / var(--pill-a)); }
+.pill.status { --h: 142; }
+.pill.status.hid { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.pill.status.nw { color: var(--new); background: var(--accent-soft); }
+.when { color: var(--muted); font-size: 13px; width: 78px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.acts { display: flex; gap: 4px; width: 148px; justify-content: flex-end; }
+.acts button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px;
+  font-size: 12.5px; font-weight: 550; opacity: 0; transition: opacity .1s; }
+.row:hover .acts button, .acts button:focus-visible { opacity: 1; }
+.acts button:hover { border-color: var(--accent); color: var(--accent); }
+@media (hover: none) { .acts button { opacity: 1; } }
+.empty { padding: 56px 20px; text-align: center; color: var(--muted); }
+.empty b { display: block; color: var(--fg); font-size: 16px; margin-bottom: 4px; }
+.more { display: flex; justify-content: center; padding: 16px; }
+
+/* bulk bar */
+.bulk { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 260%); visibility: hidden; z-index: 30; display: flex; align-items: center;
+  gap: 8px; background: var(--fg); color: var(--bg); padding: 8px 8px 8px 16px; border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3); transition: transform .18s ease, visibility .18s; font-size: 14px; font-weight: 550; }
+.bulk.show { transform: translate(-50%, 0); visibility: visible; }
+.bulk button { border: 0; background: color-mix(in srgb, var(--bg) 16%, transparent); color: inherit; border-radius: 9px;
+  padding: 7px 11px; font-weight: 550; font-size: 13.5px; }
+.bulk button:hover { background: color-mix(in srgb, var(--bg) 28%, transparent); }
+
+/* footer */
+.foot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; color: var(--muted); font-size: 13px; }
+pre { background: var(--surface); border: 1px solid var(--line); padding: 12px 14px; border-radius: 12px; max-height: 240px;
+  overflow: auto; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; margin: 10px 0 0; }
+
+/* settings dialog */
+dialog { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--fg);
+  width: min(680px, calc(100vw - 32px)); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); }
+dialog::backdrop { background: rgba(8, 10, 16, .5); backdrop-filter: blur(3px); }
+.dlg-head { display: flex; align-items: center; padding: 18px 22px 0; }
+.dlg-head h2 { margin: 0; font-size: 19px; letter-spacing: -.01em; flex: 1; }
+.tabs { display: flex; gap: 4px; padding: 14px 22px 0; border-bottom: 1px solid var(--line); }
+.tab { border: 0; background: transparent; padding: 8px 12px; border-radius: 9px 9px 0 0; color: var(--muted); font-weight: 600;
+  font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.on { color: var(--fg); border-bottom-color: var(--accent); }
+.panel { padding: 18px 22px; display: none; max-height: min(58vh, 520px); overflow: auto; }
+.panel.on { display: block; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field label, .field .lbl { font-weight: 600; font-size: 13.5px; }
+.field small, .note { color: var(--muted); font-size: 13px; }
+.field input, .field textarea { width: 100%; }
+.field textarea { min-height: 150px; resize: vertical; line-height: 1.5; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.check { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; font-weight: 550; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.dlg-foot { display: flex; align-items: center; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--line); }
+.dlg-foot .note { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .page, .top-in { padding-left: 14px; padding-right: 14px; }
+  #status { display: none; }
+  .f, .f input, .f select { width: 100%; }
+  .f { flex: 1 1 44%; }
+  .row { grid-template-columns: 10px minmax(0, 1fr); }
+  .meta { grid-column: 2; flex-wrap: wrap; }
+  .when { width: auto; }
+  .acts { width: auto; }
+  .two { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="top" id="top"><div class="top-in">
+  <div class="brand">
+    <div class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/></svg></div>
+    Internship Tracker
+  </div>
+  <span class="badge" id="badge" hidden></span>
+  <span class="grow"></span>
+  <span id="status"></span>
+</div></div>
+
+<div class="page">
+  <div class="search">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+    <input id="q" type="search" placeholder="Search by keyword, company or city" autocomplete="off">
+  </div>
+  <div class="hint">Typing filters the list. Try <code>private equity -tax</code> or <code>"new york" marketing</code>. Press <code>/</code> to jump here.</div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="filters">
+    <label class="f"><span>Field</span><input id="field" list="field-list" placeholder="All"></label>
+    <label class="f"><span>Location</span><input id="place" list="place-list" placeholder="All"></label>
+    <label class="f"><span>Show</span><input id="show" list="show-list" placeholder="Active"></label>
+    <label class="f"><span>Sort</span><select id="sort">
+      <option value="posted">Newest posted</option><option value="found">Recently found</option>
+      <option value="title">Title A–Z</option><option value="company">Company A–Z</option>
+    </select></label>
+    <button class="btn ghost" id="reset" type="button">Reset filters</button>
+    <span id="count"></span>
+  </div>
+  <datalist id="field-list"></datalist>
+  <datalist id="place-list"></datalist>
+  <datalist id="show-list"><option>Active</option><option>New only</option><option>Applied</option><option>Hidden</option><option>Everything</option></datalist>
+
+  <div class="list" id="list"></div>
+  <div class="more" id="more" hidden><button class="btn" id="more-btn">Show more</button></div>
+
+  <div class="foot">
+    <button class="btn ghost" id="seen-all">Mark all as seen</button>
+    <span>Your Applied, Hidden and seen marks are saved in this browser only.</span>
+  </div>
+</div>
+
+<div class="bulk" id="bulk">
+  <span id="bulk-n"></span>
+  <button data-act="open">Open</button><button data-act="applied">Mark applied</button>
+  <button data-act="hidden">Hide</button><button data-act="seen">Restore</button><button data-act="clear">Clear</button>
+</div>
+
+
+<script>
+let FIELDS = [];
+const HUES = [212, 172, 142, 328, 24, 268, 350, 40, 190, 220];
+const hue = (f) => HUES[Math.max(0, FIELDS.indexOf(f)) % HUES.length];
+const $ = (s) => document.querySelector(s);
+const SHOW = ["Active", "New only", "Applied", "Hidden", "Everything"];
+const PAGE_SIZE = 150;
+let data = [], selected = new Set(), shown = PAGE_SIZE;
+
+$("#field-list").innerHTML = FIELDS.map((f) => `<option>${f.replace(/&/g, "&amp;")}</option>`).join("");
+
+// Remember filters between visits (a convenience only; the page works without it).
+const FILTERS = ["q", "field", "place", "show", "sort"];
+try { const saved = JSON.parse(localStorage.getItem("filters") || "{}");
+      FILTERS.forEach((id) => { if (saved[id]) $("#" + id).value = saved[id]; }); } catch (e) {}
+function saveFilters() {
+  try { localStorage.setItem("filters", JSON.stringify(Object.fromEntries(FILTERS.map((id) => [id, $("#" + id).value])))); } catch (e) {}
+}
+
+// Keywords box: words in any order, "quoted words" kept together, -word excludes.
+function parseQuery(q) {
+  const want = [], skip = [];
+  for (const m of (q || "").toLowerCase().matchAll(/(-?)(?:"([^"]*)"|(\S+))/g)) {
+    const term = (m[2] || m[3] || "").replace(/"/g, "").trim();
+    if (term) (m[1] ? skip : want).push(term);
+  }
+  return { want, skip };
+}
+const want = (id) => { const t = $("#" + id).value.replace(/\s*\(\d+\)$/, "").trim().toLowerCase(); return t === "all" ? "" : t; };
+function showMode() {
+  const t = want("show");
+  if (!t) return $("#show").value.trim().toLowerCase() === "all" ? "Everything" : "Active";
+  return SHOW.find((o) => o.toLowerCase().startsWith(t)) || "Active";
+}
+function ago(d, found) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || "");
+  if (!m) return "";
+  const then = new Date(+m[1], m[2] - 1, +m[3]), now = new Date();
+  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - then) / 864e5);
+  if (days <= 0) {
+    // LinkedIn only gives the day, so the time is when the tracker found the posting.
+    const t = new Date(found);
+    return isNaN(t) ? "Today" : `Today ${t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  }
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+const fullDate = (d) => { const t = new Date(d); return isNaN(t) ? "" : t.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }); };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function filtered() {
+  const q = parseQuery($("#q").value), field = want("field"), place = want("place"), show = showMode();
+  const rows = data.filter((p) => {
+    if (q.want.length || q.skip.length) {
+      const hay = `${p.title} ${p.company} ${p.location} ${p.field} ${p.keywords}`.toLowerCase();
+      if (!q.want.every((w) => hay.includes(w)) || q.skip.some((w) => hay.includes(w))) return false;
+    }
+    if (field && !p.field.toLowerCase().includes(field)) return false;
+    if (place && !p.place.toLowerCase().includes(place) && !(p.location || "").toLowerCase().includes(place)) return false;
+    if (show === "Active" && p.status === "hidden") return false;
+    if (show === "New only" && p.status !== "new") return false;
+    if (show === "Applied" && p.status !== "applied") return false;
+    if (show === "Hidden" && p.status !== "hidden") return false;
+    return true;
+  });
+  const key = $("#sort").value || "posted", desc = key === "posted" || key === "found";
+  rows.sort((a, b) => {
+    const x = String(a[key] || "").toLowerCase(), y = String(b[key] || "").toLowerCase();
+    return (x < y ? -1 : x > y ? 1 : 0) * (desc ? -1 : 1);
+  });
+  return rows;
+}
+
+function rowHtml(p) {
+  const st = p.status;
+  const pill = st === "applied" ? `<span class="pill status">Applied</span>` : st === "hidden" ? `<span class="pill status hid">Hidden</span>`
+    : st === "new" ? `<span class="pill status nw">New</span>` : "";
+  const acts = st === "hidden" ? `<button data-do="seen">Restore</button>`
+    : `${st === "applied" ? `<button data-do="seen">Undo</button>` : `<button data-do="applied">Applied</button>`}<button data-do="hidden">Hide</button>`;
+  return `<div class="row ${st}${selected.has(p.id) ? " sel" : ""}" data-id="${esc(p.id)}">
+    <span class="mark"></span>
+    <div><a class="title" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>
+      <div class="sub"><b>${esc(p.company)}</b>${p.location ? " · " + esc(p.location) : ""} · ${esc(p.source)}</div></div>
+    <div class="meta">${pill}<span class="pill" style="--h:${hue(p.field)}">${esc(p.field)}</span>
+      <span class="when" title="Posted ${esc(p.posted)} · found ${esc(fullDate(p.found))}">${esc(ago(p.posted, p.found))}</span>
+      <span class="acts">${acts}</span></div>
+  </div>`;
+}
+
+function render(keepPage) {
+  if (!keepPage) shown = PAGE_SIZE;
+  // Location list: Remote first, states by name, the catch-all last, with counts.
+  const counts = {}, fields = {};
+  let active = 0;
+  data.forEach((p) => { if (p.status !== "hidden") { counts[p.place] = (counts[p.place] || 0) + 1; fields[p.field] = (fields[p.field] || 0) + 1; active++; } });
+  const order = Object.keys(counts).sort((a, b) =>
+    (a !== "Remote") - (b !== "Remote") || (a === "Nationwide / other") - (b === "Nationwide / other") || a.localeCompare(b));
+  $("#place-list").innerHTML = order.map((k) => `<option value="${esc(k)} (${counts[k]})"></option>`).join("");
+
+  const cur = want("field");
+  $("#chips").innerHTML = `<button class="chip${cur ? "" : " on"}" data-f="">All <span class="n">${active.toLocaleString()}</span></button>` +
+    FIELDS.filter((f) => fields[f]).map((f) =>
+      `<button class="chip${cur && f.toLowerCase() === cur ? " on" : ""}" data-f="${esc(f)}" style="--h:${hue(f)}"><span class="dot"></span>${esc(f)} <span class="n">${fields[f].toLocaleString()}</span></button>`).join("");
+
+  const rows = filtered();
+  $("#list").innerHTML = rows.length ? rows.slice(0, shown).map(rowHtml).join("")
+    : `<div class="empty"><b>No postings match</b>Try fewer words or reset the filters.</div>`;
+  $("#more").hidden = rows.length <= shown;
+  $("#more-btn").textContent = `Show more (${(rows.length - shown).toLocaleString()} left)`;
+  const nNew = data.filter((p) => p.status === "new").length;
+  $("#badge").hidden = !nNew; $("#badge").textContent = `${nNew.toLocaleString()} new`;
+  document.title = nNew ? `Internship Tracker (${nNew} new)` : "Internship Tracker";
+  $("#count").textContent = `${rows.length.toLocaleString()} of ${data.length.toLocaleString()} postings`;
+  [...selected].forEach((id) => { if (!byId.has(id)) selected.delete(id); });
+  $("#bulk").classList.toggle("show", selected.size > 0);
+  $("#bulk-n").textContent = `${selected.size} selected`;
+}
+
+// ---- your marks: kept in this browser, so each friend has their own list.
+// marks.s maps a posting id to "seen", "applied" or "hidden"; anything found
+// after marks.since and not marked yet counts as new.
+let marks = { since: "", s: {} }, latest = "", byId = new Map(), loaded = null;
+try { Object.assign(marks, JSON.parse(localStorage.getItem("marks") || "{}")); } catch (e) {}
+function saveMarks() { try { localStorage.setItem("marks", JSON.stringify(marks)); } catch (e) {} }
+function apply() {
+  data.forEach((p) => { p.status = marks.s[p.id] || (p.found.slice(0, 19) > marks.since ? "new" : "seen"); });
+}
+async function setStatus(ids, status, onlyNew) {
+  ids.forEach((id) => {
+    const p = byId.get(id);
+    if (p && (!onlyNew || p.status === "new")) marks.s[id] = status;
+  });
+  saveMarks(); apply(); render(true);
+}
+
+function showStatus(j) {
+  const t = new Date(j.checked_at);
+  const when = isNaN(t) ? "" : t.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  $("#status").textContent = j.error ? `${j.error} (${when})` : `Updated ${when} · checks every hour`;
+}
+
+async function load(keepPage) {
+  let j;
+  try { j = await (await fetch("postings.json", { cache: "no-cache" })).json(); }
+  catch (e) {
+    if (!loaded) $("#list").innerHTML = `<div class="empty"><b>The list isn't ready yet</b>The first check of LinkedIn is still running. Try again in a few minutes.</div>`;
+    return;
+  }
+  if (loaded === j.checked_at) return;
+  loaded = j.checked_at;
+  FIELDS = j.fields;
+  $("#field-list").innerHTML = FIELDS.map((f) => `<option>${esc(f)}</option>`).join("");
+  data = j.postings; byId = new Map(data.map((p) => [p.id, p]));
+  latest = data.reduce((m, p) => (p.found.slice(0, 19) > m ? p.found.slice(0, 19) : m), "");
+  if (!marks.since) {  // first visit: the last day's finds start out as new (not the first run's backlog)
+    const dayAgo = new Date(Date.now() - 864e5).toISOString().slice(0, 19), start = (j.started_at || "").slice(0, 19);
+    marks.since = start > dayAgo ? start : dayAgo;
+    saveMarks();
+  }
+  for (const id in marks.s) if (!byId.has(id)) delete marks.s[id];  // gone from LinkedIn
+  apply(); showStatus(j); render(keepPage);
+}
+
+$("#list").addEventListener("click", (e) => {
+  const row = e.target.closest(".row"); if (!row) return;
+  const id = row.dataset.id, btn = e.target.closest("button[data-do]");
+  if (btn) return setStatus([id], btn.dataset.do);
+  if (e.target.closest("a")) return setStatus([id], "seen", true);  // opening a posting marks it seen
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  render(true);
+});
+$("#bulk").addEventListener("click", (e) => {
+  const act = e.target.closest("button")?.dataset.act; if (!act) return;
+  const ids = [...selected];
+  if (act === "open") {
+    ids.slice(0, 10).forEach((id) => { const p = data.find((x) => x.id === id); if (p) window.open(p.url, "_blank", "noopener"); });
+    setStatus(ids, "seen", true);
+  } else if (act !== "clear") setStatus(ids, act);
+  selected.clear(); render(true);
+});
+$("#chips").addEventListener("click", (e) => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  $("#field").value = c.dataset.f; saveFilters(); render();
+});
+FILTERS.forEach((id) => {
+  const el = $("#" + id);
+  el.addEventListener(id === "sort" ? "change" : "input", () => { saveFilters(); render(); });
+  if (id !== "sort" && id !== "q") el.addEventListener("focus", () => el.select());
+});
+$("#reset").addEventListener("click", () => {
+  FILTERS.forEach((id) => { $("#" + id).value = id === "sort" ? "posted" : ""; });
+  saveFilters(); render();
+});
+$("#more-btn").addEventListener("click", () => { shown += PAGE_SIZE * 2; render(true); });
+$("#seen-all").addEventListener("click", () => { marks.since = latest; saveMarks(); apply(); render(true); });
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $("#q").focus(); }
+});
+addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 4), { passive: true });
+addEventListener("storage", (e) => { if (e.key === "marks") { try { marks = JSON.parse(e.newValue); } catch (x) {} apply(); render(true); } });
+
+load();
+setInterval(() => { if (!selected.size) load(true); }, 10 * 60000);
+</script>
+</body>
+</html>
