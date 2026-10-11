@@ -24,8 +24,8 @@ their own browser, so friends don't see or change each other's lists.
    minutes. The site is then at `https://<your-username>.github.io/<repo-name>/`.
 
 3. Optional, for an address without your GitHub username: make a free
-   Cloudflare account, create an API token with the "Edit Cloudflare Workers"
-   template, and add it plus your Cloudflare account ID as the repository secrets
+   Cloudflare account, create a custom API token with the permission
+   Account / Cloudflare Pages / Edit, and add it plus your Cloudflare account ID as the repository secrets
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The next run publishes to
    `https://internship-tracker.pages.dev` (Cloudflare adds a few letters if the
    name is taken; change `SITE_NAME` in the workflow to pick another).
