@@ -28,10 +28,14 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - id: pages
-        uses: actions/configure-pages@v5
+      # Runs before the Pages steps, so it works (and shows whether LinkedIn
+      # answers) even before Pages is switched on.
       - name: Check LinkedIn
-        run: python3 update.py "${{ steps.pages.outputs.base_url }}" site
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: python3 update.py "https://${OWNER,,}.github.io/${REPO}" site
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
