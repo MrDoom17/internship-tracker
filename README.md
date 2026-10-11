@@ -14,8 +14,8 @@ their own browser, so friends don't see or change each other's lists.
   desktop tracker (`tracker.py`), and publishes the result to GitHub Pages.
 - `site/index.html` is the page. It loads `postings.json` and keeps your marks in
   the browser (localStorage).
-- The first run fetches the last 90 days of postings; later runs only add new ones.
-  Postings older than 90 days drop off.
+- The first run fetched the last 90 days of postings; later runs only add new ones.
+  Postings are never removed, so the list keeps growing.
 
 ## Setup (once)
 

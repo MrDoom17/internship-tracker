@@ -27,7 +27,9 @@ from datetime import datetime, timedelta, timezone
 os.environ.setdefault("INTERNSHIP_TRACKER_HOME", tempfile.mkdtemp())
 import tracker  # noqa: E402
 
-KEEP_DAYS = 92  # LinkedIn's window is 90 days; a little slack so edge postings don't come and go
+# Postings stay on the site for good once found. Only the ids the title filter
+# turned down are forgotten after a while (LinkedIn's search reaches 90 days back).
+SEEN_DAYS = 92
 
 
 def get_previous(base):
@@ -84,9 +86,7 @@ def main(base, out_dir):
             "keywords": "; ".join(j.get("keywords") or []),
         }
 
-    # Drop postings older than the window.
-    cutoff = (now - timedelta(days=KEEP_DAYS)).date().isoformat()
-    posts = {i: p for i, p in posts.items() if (p.get("posted") or p["found"][:10]) >= cutoff}
+    cutoff = (now - timedelta(days=SEEN_DAYS)).date().isoformat()
     seen = {i: d for i, d in seen.items() if d >= cutoff}
     added = sum(p["found"] == stamp for p in posts.values())
 
