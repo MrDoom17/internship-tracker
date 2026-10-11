@@ -1,5 +1,8 @@
-# Checks LinkedIn every hour and publishes the list to GitHub Pages.
-# One-time setup: Settings > Pages > Source: "GitHub Actions".
+# Checks LinkedIn every hour and publishes the list to GitHub Pages and,
+# once its two secrets are added, to Cloudflare Pages (<name>.pages.dev).
+# One-time setup: Settings > Pages > Source: "GitHub Actions"; for Cloudflare,
+# add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID under
+# Settings > Secrets and variables > Actions.
 name: Check LinkedIn
 
 on:
@@ -14,6 +17,11 @@ permissions:
   pages: write
   id-token: write
   actions: write            # keeps the hourly schedule from being switched off
+
+env:
+  SITE_NAME: internship-tracker   # the Cloudflare address: internship-tracker.pages.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 concurrency:
   group: pages
@@ -41,6 +49,15 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+      # Cloudflare Pages: same files at an address without the GitHub username.
+      # Skipped until the two secrets are added.
+      - name: Create the Cloudflare site (first time only)
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        continue-on-error: true   # fails harmlessly once it exists
+        run: npx --yes wrangler@3.114.17 pages project create "$SITE_NAME" --production-branch=main
+      - name: Publish to Cloudflare
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@3.114.17 pages deploy site --project-name="$SITE_NAME" --branch=main --commit-dirty=true
       # GitHub pauses scheduled workflows after 60 days without a commit.
       # Re-enabling it on every run keeps the hourly check going.
       - name: Keep the schedule on
