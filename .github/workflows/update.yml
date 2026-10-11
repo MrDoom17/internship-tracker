@@ -19,7 +19,7 @@ permissions:
   actions: write            # keeps the hourly schedule from being switched off
 
 env:
-  SITE_NAME: internship-tracker   # the Cloudflare address: internship-tracker.pages.dev
+  SITE_NAME: internship-tracker   # Cloudflare address: https://internship-tracker-2um.pages.dev
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
