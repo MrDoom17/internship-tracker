@@ -1,1 +1,4 @@
 __pycache__/
+.wrangler/
+wrangler.toml
+node_modules/

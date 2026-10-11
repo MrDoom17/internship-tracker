@@ -30,6 +30,21 @@ their own browser, so friends don't see or change each other's lists.
    `https://internship-tracker.pages.dev` (Cloudflare adds a few letters if the
    name is taken; change `SITE_NAME` in the workflow to pick another).
 
+## Developer portal (traffic and usage)
+
+`https://<site>.pages.dev/admin` shows visitors, visits, returning visitors, time on
+the page, where people came from, countries, devices, and what they do (searches,
+postings opened, Applied/Hide clicks, filters). It asks for a password (any username).
+
+- `functions/api/e.js` receives anonymous events from the page (a random id per
+  browser; no names, emails or IP addresses). `functions/admin/` is the portal.
+- Events are stored in a free Cloudflare D1 database (`tracker-analytics`, created by
+  the workflow). The Cloudflare token needs **Account / D1 / Edit** in addition to
+  Cloudflare Pages / Edit. Events older than 13 months are deleted.
+- Opening the portal stops your own browser from being counted (checkbox at the bottom).
+- To change the password, put the SHA-256 of the new one in `PASSWORD_SHA256` in
+  `functions/admin/[[path]].js`.
+
 To change the searches, edit `DEFAULT_CONFIG` in `tracker.py`.
 
 ## Limits

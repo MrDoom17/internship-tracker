@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tracker Portal</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f1; --card: #fcfcfb; --line: #e3e2dd; --grid: #ecebe6;
+  --text: #0b0b0b; --text2: #52514e; --muted: #7d7c77;
+  --accent: #2a78d6; --accent-soft: #d6e6f8; --good: #0f7b3d; --live: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --card: #1a1a19; --line: #2e2e2c; --grid: #262624;
+    --text: #f0efec; --text2: #c3c2b7; --muted: #8f8e88;
+    --accent: #3987e5; --accent-soft: #1f3550; --good: #4cc27f; --live: #199e70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --card: #1a1a19; --line: #2e2e2c; --grid: #262624;
+  --text: #f0efec; --text2: #c3c2b7; --muted: #8f8e88;
+  --accent: #3987e5; --accent-soft: #1f3550; --good: #4cc27f; --live: #199e70;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 18px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+h1 small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 6px; }
+.live { display: inline-flex; align-items: center; gap: 6px; color: var(--text2); font-size: 13px; }
+.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 25%, transparent); }
+.grow { flex: 1; }
+.seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.seg button { border: 0; background: none; color: var(--text2); font: inherit; padding: 5px 11px; border-radius: 6px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: #fff; }
+a { color: var(--accent); }
+.grid { display: grid; gap: 12px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.kpi .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--text2); font-size: 13px; }
+.kpi .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+h2 { font-size: 14px; margin: 0 0 2px; }
+.hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 12px; }
+.chart { position: relative; }
+.chart svg { display: block; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; }
+.chart .gl { stroke: var(--grid); }
+.chart .bar { fill: var(--accent); }
+.chart .hit { fill: transparent; cursor: default; }
+.chart .hit:hover + .bar, .chart g.on .bar { fill: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+.tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); padding: 6px 9px; border-radius: 7px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); opacity: 0; transition: opacity .1s; z-index: 2; }
+.tip.show { opacity: 1; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { position: relative; display: flex; gap: 10px; padding: 5px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.list li::before { content: ""; position: absolute; inset: 0; width: var(--w); background: var(--accent-soft); border-radius: 6px; z-index: 0; }
+.list li > * { position: relative; }
+.list .k { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list .n { color: var(--text2); }
+.list .p { color: var(--muted); font-size: 12px; min-width: 64px; text-align: right; }
+.empty { color: var(--muted); padding: 6px 0; }
+.feed { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow: auto; }
+.feed li { display: flex; gap: 10px; padding: 6px 0; border-top: 1px solid var(--grid); font-size: 13px; }
+.feed li:first-child { border-top: 0; }
+.feed .t { color: var(--muted); min-width: 70px; font-variant-numeric: tabular-nums; }
+.feed .w { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed .m { color: var(--muted); }
+.acts { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.acts .kpi .v { font-size: 22px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13px; }
+th, td { text-align: right; padding: 4px 8px; border-top: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; border-top: 0; }
+details summary { cursor: pointer; color: var(--text2); font-size: 13px; margin-top: 8px; }
+.setup { max-width: 640px; }
+.setup ol { padding-left: 20px; } .setup li { margin: 6px 0; }
+footer { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+footer label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tracker Portal <small>internship-tracker-2um.pages.dev</small></h1>
+    <span class="live" id="live" hidden><i></i><span></span></span>
+    <span class="grow"></span>
+    <div class="seg" id="range">
+      <button data-d="1">Today</button><button data-d="7">7 days</button><button data-d="30">30 days</button><button data-d="90">90 days</button>
+    </div>
+  </header>
+  <main id="main"><div class="card">Loading…</div></main>
+  <footer>
+    <span id="updated"></span>
+    <label><input type="checkbox" id="me"> Don't count my own visits from this browser</label>
+    <a href="/">Open the site</a>
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const fmt = (n) => Number(n || 0).toLocaleString();
+const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "–");
+let days = 7;
+try { days = Number(localStorage.getItem("portal-days")) || 7; } catch (e) {}
+
+// The site skips tracking in a browser with this flag, so Ben's own visits
+// don't pad the numbers. On by default once this page has been opened.
+try { if (localStorage.getItem("noTrack") === null) localStorage.setItem("noTrack", "1"); $("#me").checked = localStorage.getItem("noTrack") === "1"; } catch (e) {}
+$("#me").addEventListener("change", (e) => { try { localStorage.setItem("noTrack", e.target.checked ? "1" : "0"); } catch (x) {} });
+
+const regions = (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) { return null; } })();
+const flag = (cc) => /^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 127397 + c.charCodeAt(0))) + " " : "";
+const country = (cc) => !cc || cc === "XX" ? "Unknown" : flag(cc) + ((regions && regions.of(cc)) || cc);
+const dur = (s) => { s = Math.round(s || 0); return s < 60 ? s + "s" : Math.floor(s / 60) + "m " + String(s % 60).padStart(2, "0") + "s"; };
+const dayName = (d) => new Date(d + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric" });
+const dayLong = (d) => new Date(d + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+const hourName = (h) => new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" });
+
+function startOfRange(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() - (d - 1)); return t.getTime();
+}
+function dayKeys(since) {
+  const out = [], t = new Date(since);
+  while (t.getTime() <= Date.now()) {
+    out.push(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
+    t.setDate(t.getDate() + 1);
+  }
+  return out;
+}
+
+// Single-series bar chart with a hover tooltip. items: [{label, short, value, tip}]
+const charts = [];
+function bars(items, opts = {}) {
+  if (!items.length) return `<div class="empty">No data yet.</div>`;
+  charts.push([items, opts]);
+  return `<div class="chart" data-c="${charts.length - 1}"></div>`;
+}
+function drawCharts() {
+  document.querySelectorAll(".chart[data-c]").forEach((el) => {
+    const [items, opts] = charts[el.dataset.c];
+    el.innerHTML = drawBars(items, { ...opts, width: el.clientWidth });
+  });
+}
+let resizeTimer;
+addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(drawCharts, 150); });
+function drawBars(items, { height = 170, labelEvery = 56, width = 640 } = {}) {
+  const W = Math.max(200, width), H = height, L = 30, B = 22, T = 8;
+  const every = Math.max(1, Math.ceil(items.length / Math.floor((W - L) / labelEvery)));
+  const max = Math.max(1, ...items.map((i) => i.value));
+  const step = Math.pow(10, Math.floor(Math.log10(max))), nice = Math.ceil(max / step) * step;
+  const ticks = [0, nice / 2, nice].filter((v, i, a) => a.indexOf(v) === i && Number.isInteger(v));
+  const bw = (W - L) / items.length, gap = Math.min(6, bw * 0.25);
+  const y = (v) => T + (H - T - B) * (1 - v / nice);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img">`;
+  ticks.forEach((v) => { s += `<line class="gl" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v)}</text>`; });
+  items.forEach((it, i) => {
+    const x = L + i * bw + gap / 2, w = Math.max(1, bw - gap), top = y(it.value), h = Math.max(0, y(0) - top);
+    const r = Math.min(4, w / 2, h);
+    const path = h > 0 ? `M${x},${y(0)}V${top + r}Q${x},${top} ${x + r},${top}H${x + w - r}Q${x + w},${top} ${x + w},${top + r}V${y(0)}Z` : "";
+    s += `<g data-tip="${esc(it.tip)}" data-x="${x + w / 2}" data-y="${top}"><rect class="hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}"/><path class="bar" d="${path}"/></g>`;
+    if (i % every === 0) s += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${esc(it.short)}</text>`;
+  });
+  return s + "</svg>";
+}
+document.addEventListener("pointerover", (e) => {
+  const g = e.target.closest(".chart g[data-tip]"), tip = $("#tip");
+  document.querySelectorAll(".chart g.on").forEach((x) => x !== g && x.classList.remove("on"));
+  if (!g) return tip.classList.remove("show");
+  g.classList.add("on");
+  const svg = g.ownerSVGElement, box = svg.getBoundingClientRect(), k = box.width / svg.viewBox.baseVal.width;
+  tip.innerHTML = g.dataset.tip;
+  tip.style.left = box.left + scrollX + g.dataset.x * k + "px";
+  tip.style.top = box.top + scrollY + g.dataset.y * k - 8 + "px";
+  tip.classList.add("show");
+});
+
+function list(rows, { label = (k) => k || "–", unit = "people", total, extra } = {}) {
+  if (!rows.length) return `<div class="empty">Nothing yet.</div>`;
+  const max = Math.max(...rows.map((r) => r.n), 1);
+  return `<ul class="list">${rows.map((r) => `<li style="--w:${(100 * r.n) / max}%"><span class="k" title="${esc(label(r.k))}">${esc(label(r.k))}</span>` +
+    `<span class="n">${fmt(r.n)}</span><span class="p">${extra ? esc(extra(r)) : total ? pct(r.n, total) : ""}</span></li>`).join("")}</ul>`;
+}
+
+const ACTION = {
+  view: "opened the site", search: "searched", applied: "marked Applied", hidden: "hid", restore: "restored",
+  open: "opened a posting", field: "filtered by field", place: "filtered by location",
+};
+function feedLine(e) {
+  const t = new Date(e.ts), today = new Date().toDateString() === t.toDateString();
+  const when = today ? t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : t.toLocaleDateString([], { month: "short", day: "numeric" });
+  let what = ACTION[e.type] || e.type;
+  if (e.detail) what += e.type === "search" ? ` “${e.detail}”` : ` · ${e.detail}`;
+  if (e.n > 1 && (e.type === "applied" || e.type === "hidden")) what += ` (${e.n} postings)`;
+  if (e.type === "view") what += e.ret ? " · returning" : " · first visit";
+  return `<li><span class="t">${esc(when)}</span><span class="w">${esc(what)}</span><span class="m">${esc(e.device || "")}${e.country ? " · " + esc(flag(e.country) + e.country) : ""}</span></li>`;
+}
+
+function render(d, since) {
+  const t = d.totals, A = Object.fromEntries(d.actions.map((a) => [a.k, a]));
+  const act = (k) => A[k] || { n: 0, p: 0, items: 0 };
+  $("#live").hidden = false;
+  $("#live span").textContent = `${fmt(t.live)} on the site now`;
+  const label = days === 1 ? "today" : `in the last ${days} days`;
+
+  const keys = dayKeys(since), byDay = Object.fromEntries(d.daily.map((r) => [r.d, r]));
+  const daily = keys.map((k) => { const r = byDay[k] || { visitors: 0, visits: 0, views: 0 };
+    return { short: dayName(k), value: r.visitors, tip: `<b>${dayLong(k)}</b><br>${fmt(r.visitors)} visitors · ${fmt(r.visits)} visits · ${fmt(r.views)} page views` }; });
+  const hb = Object.fromEntries(d.hours.map((r) => [r.h, r.n]));
+  const hours = [...Array(24).keys()].map((h) => ({ short: hourName(h), value: hb[h] || 0, tip: `<b>${hourName(h)}</b><br>${fmt(hb[h] || 0)} visits` }));
+  charts.length = 0;
+  const dayChart = days === 1 ? bars(hours, { labelEvery: 48 }) : bars(daily);
+
+  $("#main").innerHTML = `
+  <section class="grid kpis">
+    <div class="card kpi"><div class="l">Visitors</div><div class="v">${fmt(t.visitors)}</div><div class="s">different people ${label}</div></div>
+    <div class="card kpi"><div class="l">Visits</div><div class="v">${fmt(t.visits)}</div><div class="s">${t.visitors ? (t.visits / t.visitors).toFixed(1) : "0"} per visitor</div></div>
+    <div class="card kpi"><div class="l">Page views</div><div class="v">${fmt(t.views)}</div><div class="s">incl. reloads</div></div>
+    <div class="card kpi"><div class="l">Returning</div><div class="v">${pct(t.back, t.visitors)}</div><div class="s">${fmt(t.back)} came back after a first visit</div></div>
+    <div class="card kpi"><div class="l">Time per visit</div><div class="v">${dur(t.secs)}</div><div class="s">average time on the page</div></div>
+  </section>
+  <section class="card">
+    <h2>${days === 1 ? "Visits by hour today" : "Visitors per day"}</h2>
+    <p class="hint">Hover a bar for visits and page views.</p>
+    ${dayChart}
+    <details><summary>Show as a table</summary><table><tr><th>Day</th><th>Visitors</th><th>Visits</th><th>Page views</th></tr>
+      ${keys.slice().reverse().map((k) => { const r = byDay[k] || {}; return `<tr><td>${dayLong(k)}</td><td>${fmt(r.visitors)}</td><td>${fmt(r.visits)}</td><td>${fmt(r.views)}</td></tr>`; }).join("")}</table></details>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h2>What people do</h2><p class="hint">Clicks ${label}, and how many people did each.</p>
+      <div class="grid acts">
+        ${[["search", "Searches"], ["open", "Postings opened"], ["applied", "Marked Applied"], ["hidden", "Hidden"], ["field", "Field filters"], ["place", "Location filters"]].map(([k, l]) => {
+          const a = act(k), n = k === "applied" || k === "hidden" ? a.items || a.n : a.n;
+          return `<div class="kpi"><div class="l">${l}</div><div class="v">${fmt(n)}</div><div class="s">by ${fmt(a.p)} ${a.p === 1 ? "person" : "people"}</div></div>`; }).join("")}
+      </div>
+      ${days === 1 ? "" : `<h2 style="margin-top:16px">Busiest hours</h2><p class="hint">Visits by time of day, your time.</p>${bars(hours, { height: 150, labelEvery: 48 })}`}</div>
+    <div class="card"><h2>Recent activity</h2><p class="hint">Latest clicks, newest first. No names, just device and country.</p>
+      ${d.recent.length ? `<ul class="feed">${d.recent.map(feedLine).join("")}</ul>` : `<div class="empty">Nothing yet.</div>`}</div>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h2>Where visitors came from</h2><p class="hint">“Direct” is a typed or texted link, which hides the source.</p>
+      ${list(d.refs, { label: (k) => k || "Direct / text message", total: t.visitors })}</div>
+    <div class="card"><h2>Countries</h2><p class="hint">Visitors by country.</p>${list(d.countries, { label: country, total: t.visitors })}</div>
+    <div class="card"><h2>Devices</h2><p class="hint">Visitors by device.</p>${list(d.devices, { total: t.visitors })}
+      <h2 style="margin-top:14px">Browsers</h2>${list(d.browsers, { total: t.visitors })}</div>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h2>What people search for</h2><p class="hint">Words typed in the search box. Times searched, then people.</p>
+      ${list(d.searches, { label: (k) => `“${k}”`, extra: (r) => `${r.p} ${r.p === 1 ? "person" : "people"}` })}</div>
+    <div class="card"><h2>Fields people apply to</h2><p class="hint">Field of each posting marked Applied.</p>
+      ${list(d.applied, { extra: (r) => `${r.p} ${r.p === 1 ? "person" : "people"}` })}
+      <h2 style="margin-top:14px">Fields people filter by</h2>${list(d.fields, { extra: (r) => `${r.p} ${r.p === 1 ? "person" : "people"}` })}
+      <h2 style="margin-top:14px">Locations people filter by</h2>${list(d.places, { extra: (r) => `${r.p} ${r.p === 1 ? "person" : "people"}` })}</div>
+  </section>`;
+
+  drawCharts();
+  const at = d.allTime;
+  $("#updated").textContent = `All time: ${fmt(at.visitors)} visitors, ${fmt(at.visits)} visits` +
+    (at.first ? ` since ${new Date(at.first).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}` : "") +
+    ` · Updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
+function setupNeeded() {
+  $("#main").innerHTML = `<div class="card setup"><h2>Almost ready</h2>
+    <p>The portal is up, but the database that stores visits isn't connected yet. Once it is, numbers start appearing here within a minute of someone opening the site.</p></div>`;
+}
+
+let busy = false;
+async function load() {
+  if (busy) return; busy = true;
+  document.querySelectorAll("#range button").forEach((b) => b.classList.toggle("on", Number(b.dataset.d) === days));
+  const since = startOfRange(days);
+  try {
+    const r = await fetch(`/admin/stats?since=${since}&tz=${new Date().getTimezoneOffset()}`, { cache: "no-store" });
+    const d = await r.json();
+    d.ready ? render(d, since) : setupNeeded();
+  } catch (e) {
+    $("#main").innerHTML = `<div class="card">Couldn't load the numbers. Check your connection and reload.</div>`;
+  }
+  busy = false;
+}
+$("#range").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  days = Number(b.dataset.d); try { localStorage.setItem("portal-days", days); } catch (x) {}
+  load();
+});
+load();
+setInterval(() => { if (!document.hidden) load(); }, 60000);
+</script>
+</body>
+</html>

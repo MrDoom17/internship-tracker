@@ -55,6 +55,22 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != ''
         continue-on-error: true   # fails harmlessly once it exists
         run: npx --yes wrangler@3.114.17 pages project create "$SITE_NAME" --production-branch=main
+      # The developer portal (/admin) keeps visit counts in a free Cloudflare D1
+      # database. Needs the token to also have Account / D1 / Edit; until then
+      # the site and portal still deploy, the portal just says it isn't connected.
+      - name: Connect the portal database
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        continue-on-error: true
+        run: |
+          W="npx --yes wrangler@3.114.17"
+          find_db() { $W d1 list --json 2>/dev/null | python3 -c 'import json,sys,re
+          t=sys.stdin.read(); m=re.search(r"\[.*\]", t, re.S)
+          print(next((d["uuid"] for d in json.loads(m.group(0)) if d["name"]=="tracker-analytics"), "") if m else "")'; }
+          id=$(find_db)
+          if [ -z "$id" ]; then $W d1 create tracker-analytics && id=$(find_db); fi
+          if [ -z "$id" ]; then echo "::warning::No D1 database: add Account / D1 / Edit to the Cloudflare token"; exit 0; fi
+          printf 'name = "%s"\npages_build_output_dir = "site"\ncompatibility_date = "2024-09-23"\n\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "tracker-analytics"\ndatabase_id = "%s"\n' "$SITE_NAME" "$id" > wrangler.toml
+          $W d1 execute tracker-analytics --remote --file=schema.sql || rm wrangler.toml
       - name: Publish to Cloudflare
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx --yes wrangler@3.114.17 pages deploy site --project-name="$SITE_NAME" --branch=main --commit-dirty=true

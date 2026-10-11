@@ -353,6 +353,11 @@ function apply() {
   data.forEach((p) => { p.status = marks.s[p.id] || (p.found.slice(0, 19) > marks.since ? "new" : "seen"); });
 }
 async function setStatus(ids, status, onlyNew) {
+  if (!onlyNew) {  // usage count per field, e.g. 3 Finance postings marked Applied
+    const byField = {};
+    ids.forEach((id) => { const p = byId.get(id); if (p && p.status !== status) byField[p.field] = (byField[p.field] || 0) + 1; });
+    for (const f in byField) track(status === "seen" ? "restore" : status, f, byField[f]);
+  }
   ids.forEach((id) => {
     const p = byId.get(id);
     if (p && (!onlyNew || p.status === "new")) marks.s[id] = status;
@@ -392,7 +397,7 @@ $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const id = row.dataset.id, btn = e.target.closest("button[data-do]");
   if (btn) return setStatus([id], btn.dataset.do);
-  if (e.target.closest("a")) return setStatus([id], "seen", true);  // opening a posting marks it seen
+  if (e.target.closest("a")) { track("open", byId.get(id)?.field); return setStatus([id], "seen", true); }  // opening a posting marks it seen
   selected.has(id) ? selected.delete(id) : selected.add(id);
   render(true);
 });
@@ -400,7 +405,7 @@ $("#bulk").addEventListener("click", (e) => {
   const act = e.target.closest("button")?.dataset.act; if (!act) return;
   const ids = [...selected];
   if (act === "open") {
-    ids.slice(0, 10).forEach((id) => { const p = data.find((x) => x.id === id); if (p) window.open(p.url, "_blank", "noopener"); });
+    ids.slice(0, 10).forEach((id) => { const p = data.find((x) => x.id === id); if (p) { window.open(p.url, "_blank", "noopener"); track("open", p.field); } });
     setStatus(ids, "seen", true);
   } else if (act !== "clear") setStatus(ids, act);
   selected.clear(); render(true);
@@ -408,6 +413,7 @@ $("#bulk").addEventListener("click", (e) => {
 $("#chips").addEventListener("click", (e) => {
   const c = e.target.closest(".chip"); if (!c) return;
   $("#field").value = c.dataset.f; saveFilters(); render();
+  if (c.dataset.f) track("field", c.dataset.f);
 });
 FILTERS.forEach((id) => {
   const el = $("#" + id);
@@ -426,6 +432,45 @@ document.addEventListener("keydown", (e) => {
 });
 addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 4), { passive: true });
 addEventListener("storage", (e) => { if (e.key === "marks") { try { marks = JSON.parse(e.newValue); } catch (x) {} apply(); render(true); } });
+
+// ---- anonymous usage counts for the owner's portal (/admin). A random id per
+// browser, no names or emails. Only runs on the pages.dev site, where the
+// receiving function lives.
+const track = (() => {
+  if (!/\.pages\.dev$/.test(location.hostname)) return () => {};
+  let off = false, vid = "", sid = "", ret = 0;
+  const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  try {
+    off = localStorage.getItem("noTrack") === "1";
+    vid = localStorage.getItem("vid") || ""; ret = vid ? 1 : 0;
+    if (!vid) { vid = rid(); localStorage.setItem("vid", vid); }
+    sid = sessionStorage.getItem("sid") || "";
+    if (!sid) { sid = rid(); sessionStorage.setItem("sid", sid); }
+  } catch (e) { vid = vid || rid(); sid = sid || rid(); }
+  const send = (events) => {
+    if (off || !events.length) return;
+    const body = JSON.stringify({ v: vid, s: sid, r: ret, e: events });
+    if (!(navigator.sendBeacon && navigator.sendBeacon("/api/e", body)))
+      fetch("/api/e", { method: "POST", body, keepalive: true }).catch(() => {});
+  };
+  // Time on the page: count seconds while the tab is visible, report when it's hidden.
+  let shownAt = document.hidden ? 0 : Date.now();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && shownAt) { send([{ t: "leave", n: Math.round((Date.now() - shownAt) / 1000) }]); shownAt = 0; }
+    else if (!document.hidden) shownAt = Date.now();
+  });
+  send([{ t: "view", ref: document.referrer }]);
+  return (t, d, n) => send([{ t, d, n }]);
+})();
+let searchTimer;
+$("#q").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = $("#q").value.trim();
+  if (q.length >= 2) searchTimer = setTimeout(() => track("search", q), 2000);  // once typing stops
+});
+["field", "place"].forEach((id) => $("#" + id).addEventListener("change", () => {
+  const v = $("#" + id).value.replace(/\s*\(\d[\d,]*\)$/, "").trim(); if (v) track(id, v);
+}));
 
 load();
 setInterval(() => { if (!selected.size) load(true); }, 10 * 60000);
