@@ -160,6 +160,29 @@ dialog::backdrop { background: rgba(8, 10, 16, .5); backdrop-filter: blur(3px); 
 .dlg-foot { display: flex; align-items: center; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--line); }
 .dlg-foot .note { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* posting panel, slides out on the left */
+.row.open { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
+.row { cursor: pointer; }
+#scrim { position: fixed; inset: 0; z-index: 39; background: rgba(8, 10, 16, .28); opacity: 0; visibility: hidden; transition: opacity .18s, visibility .18s; }
+#scrim.show { opacity: 1; visibility: visible; }
+#job { position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; width: min(500px, 100vw); background: var(--surface);
+  border-right: 1px solid var(--line); box-shadow: 12px 0 40px rgba(0, 0, 0, .22); display: flex; flex-direction: column;
+  transform: translateX(-104%); visibility: hidden; transition: transform .2s ease, visibility .2s; }
+#job.show { transform: none; visibility: visible; }
+.job-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--line); }
+.job-top { display: flex; align-items: flex-start; gap: 10px; }
+.job-top h2 { margin: 0; font-size: 19px; line-height: 1.3; letter-spacing: -.01em; flex: 1; }
+.job-sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.job-sub b { color: var(--fg); font-weight: 600; }
+.job-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.job-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.job-acts a.btn { text-decoration: none; }
+.job-body { padding: 18px 22px 40px; overflow: auto; flex: 1; }
+.job-body h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.job-desc { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; line-height: 1.6; }
+.job-none { color: var(--muted); font-size: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+@media (prefers-reduced-motion: reduce) { #job, #scrim { transition: none; } }
+
 @media (max-width: 760px) {
   .page, .top-in { padding-left: 14px; padding-right: 14px; }
   #status { display: none; }
@@ -189,7 +212,7 @@ dialog::backdrop { background: rgba(8, 10, 16, .5); backdrop-filter: blur(3px); 
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
     <input id="q" type="search" placeholder="Search by keyword, company or city" autocomplete="off">
   </div>
-  <div class="hint">Typing filters the list. Try <code>private equity -tax</code> or <code>"new york" marketing</code>. Press <code>/</code> to jump here.</div>
+  <div class="hint">Typing filters the list. Try <code>private equity -tax</code> or <code>"new york" marketing</code>. Click a posting to read its description. Ctrl or ⌘-click to select several.</div>
 
   <div class="chips" id="chips"></div>
 
@@ -216,6 +239,17 @@ dialog::backdrop { background: rgba(8, 10, 16, .5); backdrop-filter: blur(3px); 
     <span>Your Applied, Hidden and seen marks are saved in this browser only.</span>
   </div>
 </div>
+
+<div id="scrim"></div>
+<aside id="job" aria-label="Posting details" aria-hidden="true">
+  <div class="job-head">
+    <div class="job-top"><h2 id="job-title"></h2><button class="btn ghost icon" id="job-close" aria-label="Close">✕</button></div>
+    <div class="job-sub" id="job-sub"></div>
+    <div class="job-meta" id="job-meta"></div>
+    <div class="job-acts" id="job-acts"></div>
+  </div>
+  <div class="job-body"><h3>Job description</h3><div id="job-desc"></div></div>
+</aside>
 
 <div class="bulk" id="bulk">
   <span id="bulk-n"></span>
@@ -304,7 +338,7 @@ function rowHtml(p) {
     : st === "new" ? `<span class="pill status nw">New</span>` : "";
   const acts = st === "hidden" ? `<button data-do="seen">Restore</button>`
     : `${st === "applied" ? `<button data-do="seen">Undo</button>` : `<button data-do="applied">Applied</button>`}<button data-do="hidden">Hide</button>`;
-  return `<div class="row ${st}${selected.has(p.id) ? " sel" : ""}" data-id="${esc(p.id)}">
+  return `<div class="row ${st}${selected.has(p.id) ? " sel" : ""}${p.id === openId ? " open" : ""}" data-id="${esc(p.id)}">
     <span class="mark"></span>
     <div><a class="title" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>
       <div class="sub"><b>${esc(p.company)}</b>${p.location ? " · " + esc(p.location) : ""} · ${esc(p.source)}</div></div>
@@ -363,6 +397,7 @@ async function setStatus(ids, status, onlyNew) {
     if (p && (!onlyNew || p.status === "new")) marks.s[id] = status;
   });
   saveMarks(); apply(); render(true);
+  if (openId && ids.includes(openId)) fillJob(byId.get(openId));
 }
 
 function showStatus(j) {
@@ -380,6 +415,7 @@ async function load(keepPage) {
   }
   if (loaded === j.checked_at) return;
   loaded = j.checked_at;
+  descs = null;  // fetched again the next time a posting is opened
   FIELDS = j.fields;
   $("#field-list").innerHTML = FIELDS.map((f) => `<option>${esc(f)}</option>`).join("");
   data = j.postings; byId = new Map(data.map((p) => [p.id, p]));
@@ -397,9 +433,14 @@ $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const id = row.dataset.id, btn = e.target.closest("button[data-do]");
   if (btn) return setStatus([id], btn.dataset.do);
-  if (e.target.closest("a")) { track("open", byId.get(id)?.field); return setStatus([id], "seen", true); }  // opening a posting marks it seen
-  selected.has(id) ? selected.delete(id) : selected.add(id);
-  render(true);
+  const multi = e.ctrlKey || e.metaKey || e.shiftKey;
+  if (e.target.closest("a") && multi) { track("open", byId.get(id)?.field); return setStatus([id], "seen", true); }  // a new tab, as usual
+  e.preventDefault();
+  if (multi || selected.size) {  // selecting several for the bar at the bottom
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    return render(true);
+  }
+  openJob(id);
 });
 $("#bulk").addEventListener("click", (e) => {
   const act = e.target.closest("button")?.dataset.act; if (!act) return;
@@ -432,6 +473,49 @@ document.addEventListener("keydown", (e) => {
 });
 addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 4), { passive: true });
 addEventListener("storage", (e) => { if (e.key === "marks") { try { marks = JSON.parse(e.newValue); } catch (x) {} apply(); render(true); } });
+
+// ---- posting panel: description (saved for postings from the last day) and the LinkedIn link
+let openId = null, descs = null;
+const loadDescs = () => (descs ||= fetch("descriptions.json", { cache: "no-cache" })
+  .then((r) => (r.ok ? r.json() : {})).then((j) => j.descriptions || {}).catch(() => { descs = null; return {}; }));
+const fmtDay = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); return m ? new Date(+m[1], m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""; };
+function fillJob(p) {
+  $("#job-title").textContent = p.title;
+  $("#job-sub").innerHTML = `<b>${esc(p.company)}</b>${p.location ? " · " + esc(p.location) : ""}`;
+  $("#job-meta").innerHTML = `<span class="pill" style="--h:${hue(p.field)}">${esc(p.field)}</span>` +
+    (p.status === "applied" ? `<span class="pill status">Applied</span>` : p.status === "hidden" ? `<span class="pill status hid">Hidden</span>` : "") +
+    `<span>Posted ${esc(fmtDay(p.posted) || "recently")}</span>`;
+  $("#job-acts").innerHTML = `<a class="btn primary" id="job-link" href="${esc(p.url)}" target="_blank" rel="noopener">Open on LinkedIn ↗</a>` +
+    (p.status === "applied" ? `<button class="btn" data-do="seen">Undo applied</button>` : `<button class="btn" data-do="applied">Mark applied</button>`) +
+    (p.status === "hidden" ? `<button class="btn" data-do="seen">Restore</button>` : `<button class="btn" data-do="hidden">Hide</button>`);
+}
+async function openJob(id) {
+  const p = byId.get(id); if (!p) return;
+  openId = id; fillJob(p);
+  const desc = $("#job-desc");
+  const none = `<div class="job-none">Descriptions are saved for postings from the last day. Open this one on LinkedIn to read the full posting.</div>`;
+  desc.innerHTML = p.d ? `<div class="job-none">Loading the description…</div>` : none;
+  $("#job").classList.add("show"); $("#job").setAttribute("aria-hidden", "false"); $("#scrim").classList.add("show");
+  $("#job .job-body").scrollTop = 0;
+  track("open", p.field);
+  setStatus([id], "seen", true);
+  if (p.d) {
+    const text = (await loadDescs())[id];
+    if (openId !== id) return;
+    desc.innerHTML = text ? `<div class="job-desc">${esc(text)}</div>` : none;
+  }
+}
+function closeJob() {
+  if (!openId) return;
+  openId = null; render(true);
+  $("#job").classList.remove("show"); $("#job").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("show");
+}
+$("#job-close").addEventListener("click", closeJob);
+$("#scrim").addEventListener("click", closeJob);
+$("#job-acts").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-do]"); if (b && openId) setStatus([openId], b.dataset.do);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeJob(); });
 
 // ---- anonymous usage counts for the owner's portal (/admin). A random id per
 // browser, no names or emails. Only runs on the pages.dev site, where the
