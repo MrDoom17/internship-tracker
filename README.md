@@ -41,7 +41,9 @@ postings opened, Applied/Hide clicks, filters). It asks for a password (any user
   visits and IP addresses are logged. `functions/admin/` is the portal.
 - Events are stored in a free Cloudflare D1 database (`tracker-analytics`, created by
   the workflow). The Cloudflare token needs **Account / D1 / Edit** in addition to
-  Cloudflare Pages / Edit. Events older than 13 months are deleted.
+  Cloudflare Pages / Edit. Events older than 13 months are deleted, and IP addresses
+  are blanked after 90 days. Events must come from the site's own pages, and each IP
+  address can log at most 120 events a minute.
 - Opening the portal stops your own browser from being counted (checkbox at the bottom).
 - To change the password, put the SHA-256 of the new one in `PASSWORD_SHA256` in
   `functions/admin/[[path]].js`.

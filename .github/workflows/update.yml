@@ -76,6 +76,7 @@ jobs:
           for c in city region os net title screen lang ip; do
             echo "$have" | grep -q "\"$c\"" || $W d1 execute tracker-analytics --remote --command "ALTER TABLE events ADD COLUMN $c TEXT" || true
           done
+          $W d1 execute tracker-analytics --remote --command "CREATE INDEX IF NOT EXISTS events_ip_ts ON events (ip, ts)" || true
       - name: Publish to Cloudflare
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx --yes wrangler@3.114.17 pages deploy site --project-name="$SITE_NAME" --branch=main --commit-dirty=true
