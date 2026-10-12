@@ -485,7 +485,7 @@ document.addEventListener("keydown", (e) => {
 addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 4), { passive: true });
 addEventListener("storage", (e) => { if (e.key === "marks") { try { marks = JSON.parse(e.newValue); } catch (x) {} apply(); render(true); } });
 
-// ---- posting panel: description (saved for postings from the last day) and the LinkedIn link
+// ---- posting panel: description (saved for postings from the last 30 days) and the LinkedIn link
 let openId = null, descs = null;
 const loadDescs = () => (descs ||= fetch("descriptions.json", { cache: "no-cache" })
   .then((r) => (r.ok ? r.json() : {})).then((j) => j.descriptions || {}).catch(() => { descs = null; return {}; }));
@@ -504,7 +504,7 @@ async function openJob(id) {
   const p = byId.get(id); if (!p) return;
   openId = id; fillJob(p);
   const desc = $("#job-desc");
-  const none = `<div class="job-none">Descriptions are saved for postings from the last day. Open this one on LinkedIn to read the full posting.</div>`;
+  const none = `<div class="job-none">Descriptions are saved for postings from the last 30 days. Open this one on LinkedIn to read the full posting.</div>`;
   desc.innerHTML = p.d ? `<div class="job-none">Loading the description…</div>` : none;
   $("#job").classList.add("show"); $("#job").setAttribute("aria-hidden", "false"); $("#scrim").classList.add("show");
   $("#job .job-body").scrollTop = 0;

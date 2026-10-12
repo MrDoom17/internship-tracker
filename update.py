@@ -12,7 +12,7 @@ PREVIOUS_URL is where the live site serves its files (".../postings.json",
 check pages back through the last 90 days. OUT_DIR gets postings.json (what the
 page shows), seen.json (ids the title filter turned down, so later checks
 know they've been seen) and descriptions.json (job descriptions, fetched for
-postings from the last day; the page loads it when a posting is opened).
+postings from the last 30 days; the page loads it when a posting is opened).
 """
 import html
 import json
@@ -38,8 +38,9 @@ import tracker  # noqa: E402
 SEEN_DAYS = 92
 
 # Descriptions come from each posting's own page, one request per posting, so
-# they're only fetched for postings from the last day, a few at a time.
-DESC_DAYS = 1
+# they're only fetched for postings from the last 30 days, a few at a time,
+# newest first; a backlog is worked through over several hourly runs.
+DESC_DAYS = 30
 DESC_MAX = 400       # per run; the rest wait for the next hourly run
 DESC_WORKERS = 3
 LI_POSTING = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
@@ -137,10 +138,12 @@ def main(base, out_dir):
 
     # Descriptions for postings from the last day that don't have one yet.
     since = (now - timedelta(days=DESC_DAYS)).date().isoformat()
-    want = [i for i, p in posts.items() if i.startswith("linkedin:") and i not in descs
-            and (p.get("posted") or p["found"][:10]) >= since][:DESC_MAX]
+    day = lambda p: p.get("posted") or p["found"][:10]
+    missing = sorted((i for i, p in posts.items() if i.startswith("linkedin:") and i not in descs
+                      and day(p) >= since), key=lambda i: day(posts[i]), reverse=True)
+    want = missing[:DESC_MAX]
     if want:
-        print(f"Fetching {len(want)} description(s)...")
+        print(f"Fetching {len(want)} of {len(missing)} missing description(s)...")
         with ThreadPoolExecutor(max_workers=DESC_WORKERS) as pool:
             got = {pid: text for pid, text in pool.map(fetch_description, want) if text}
         descs.update(got)
