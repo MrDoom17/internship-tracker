@@ -262,7 +262,7 @@ function visitorTable(rows) {
     <th>Last seen</th><th class="num">Visits</th><th class="num">Time</th><th>What they did</th></tr></thead><tbody>` +
     rows.map((v) => `<tr data-v="${esc(v.vid)}"><td><span class="who">#${v.num}</span>${v.visitsAll > 1 ? `<span class="tag">returning</span>` : `<span class="tag new">new</span>`}
       <div class="sub">since ${esc(new Date(v.first).toLocaleDateString([], { month: "short", day: "numeric" }))}</div></td>
-      <td>${esc(where(v) || "Unknown")}${v.net ? `<div class="sub">${esc(v.net)}</div>` : ""}</td>
+      <td>${esc(where(v) || "Unknown")}<div class="sub">${esc([v.ip, v.net].filter(Boolean).join(" · "))}</div></td>
       <td>${esc(devName(v))}${v.screen ? `<div class="sub">${esc(v.screen)}${v.lang ? " · " + esc(v.lang) : ""}</div>` : ""}</td>
       <td>${esc(refName(v.firstRef))}</td><td>${esc(when(v.last))}</td>
       <td class="num">${fmt(v.visits)}${v.visitsAll > v.visits ? `<div class="sub">${fmt(v.visitsAll)} all time</div>` : ""}</td>
@@ -285,7 +285,7 @@ async function openVisitor(vid) {
   visits.sort((a, b) => b.ev[0].ts - a.ev[0].ts);
   const total = visits.length;
   $("#d-body").innerHTML = `<div class="facts">
-      ${fact("Where", where(p) || "Unknown")}${fact("Network", p.net)}${fact("Device", devName(p))}
+      ${fact("Where", where(p) || "Unknown")}${fact(p.ips && p.ips.includes(",") ? "IP addresses" : "IP address", (p.ips || "").split(",").join(", "))}${fact("Network", p.net)}${fact("Device", devName(p))}
       ${fact("Screen", p.screen)}${fact("Language", p.lang)}${fact("First came from", refName(p.firstRef))}
       ${fact("First seen", fullWhen(p.first))}${fact("Last seen", fullWhen(p.last))}
       ${fact("Visits", fmt(p.visitsAll))}${fact("Total time on the page", dur(p.secs))}
@@ -293,7 +293,7 @@ async function openVisitor(vid) {
     visits.map((v, i) => {
       const start = v.ev[0], secs = v.ev.filter((e) => e.type === "leave").reduce((a, e) => a + e.n, 0);
       const steps = v.ev.filter((e) => !(e.type === "leave" && e.n < 5));
-      return `<div class="visit"><h3>Visit ${total - i}<span>${esc(fullWhen(start.ts))}${secs ? " · " + dur(secs) : ""}${start.city ? " · " + esc(start.city) : ""} · ${esc(start.device || "")}</span></h3>
+      return `<div class="visit"><h3>Visit ${total - i}<span>${esc(fullWhen(start.ts))}${secs ? " · " + dur(secs) : ""}${start.city ? " · " + esc(start.city) : ""} · ${esc(start.device || "")}${start.ip ? " · " + esc(start.ip) : ""}</span></h3>
         <ul class="steps">${steps.map((e) => `<li><span class="t">${esc(new Date(e.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span><span>${actionText(e)}</span></li>`).join("")}</ul></div>`;
     }).join("");
 }

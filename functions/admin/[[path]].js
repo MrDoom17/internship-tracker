@@ -37,7 +37,7 @@ export async function onRequest({ request, env, params }) {
 const NUMBERED = `SELECT vid, ROW_NUMBER() OVER (ORDER BY min(ts), vid) AS num, min(ts) AS first, max(ts) AS last,
   count(DISTINCT sid) AS visitsAll FROM events GROUP BY vid`;
 // The latest known details of each visitor (from their most recent page load).
-const PROFILE = `SELECT vid, country, region, city, device, os, browser, screen, lang, net FROM events
+const PROFILE = `SELECT vid, country, region, city, device, os, browser, screen, lang, net, ip FROM events
   WHERE id IN (SELECT max(id) FROM events WHERE type = 'view' GROUP BY vid)`;
 const FIRST_REF = `SELECT vid, ref AS firstRef FROM events WHERE id IN (SELECT min(id) FROM events WHERE type = 'view' GROUP BY vid)`;
 
@@ -80,7 +80,7 @@ async function stats(request, env) {
         sum(e.type = 'search') AS searches, sum(e.type = 'open') AS opens, sum(e.type = 'linkedin') AS linkedin,
         coalesce(sum(CASE WHEN e.type = 'applied' THEN max(e.n, 1) END), 0) AS applied,
         coalesce(sum(CASE WHEN e.type = 'hidden' THEN max(e.n, 1) END), 0) AS hidden,
-        p.country, p.region, p.city, p.device, p.os, p.browser, p.screen, p.lang, p.net, f.firstRef
+        p.country, p.region, p.city, p.device, p.os, p.browser, p.screen, p.lang, p.net, p.ip, f.firstRef
       FROM (${NUMBERED}) v JOIN events e ON e.vid = v.vid AND e.ts >= ?
       LEFT JOIN (${PROFILE}) p ON p.vid = v.vid LEFT JOIN (${FIRST_REF}) f ON f.vid = v.vid
       GROUP BY v.vid ORDER BY v.last DESC LIMIT 300`).bind(since),
@@ -106,10 +106,11 @@ async function visitor(request, env) {
   if (!env.DB) return json({ ready: false });
   const vid = new URL(request.url).searchParams.get("v") || "";
   const r = await env.DB.batch([
-    env.DB.prepare(`SELECT v.*, p.country, p.region, p.city, p.device, p.os, p.browser, p.screen, p.lang, p.net, f.firstRef,
-        (SELECT coalesce(sum(n), 0) FROM events WHERE vid = ?1 AND type = 'leave') AS secs
+    env.DB.prepare(`SELECT v.*, p.country, p.region, p.city, p.device, p.os, p.browser, p.screen, p.lang, p.net, p.ip, f.firstRef,
+        (SELECT coalesce(sum(n), 0) FROM events WHERE vid = ?1 AND type = 'leave') AS secs,
+        (SELECT group_concat(DISTINCT ip) FROM events WHERE vid = ?1 AND ip != '') AS ips
       FROM (${NUMBERED}) v LEFT JOIN (${PROFILE}) p ON p.vid = v.vid LEFT JOIN (${FIRST_REF}) f ON f.vid = v.vid WHERE v.vid = ?1`).bind(vid),
-    env.DB.prepare(`SELECT ts, sid, type, ref, detail, title, n, ret, city, region, country, device, os, browser, net
+    env.DB.prepare(`SELECT ts, sid, type, ref, detail, title, n, ret, city, region, country, device, os, browser, net, ip
       FROM events WHERE vid = ? ORDER BY id DESC LIMIT 1500`).bind(vid),
   ]);
   return json({ ready: true, profile: (r[0].results || [])[0] || null, events: (r[1].results || []).reverse() });

@@ -36,8 +36,9 @@ their own browser, so friends don't see or change each other's lists.
 the page, where people came from, countries, devices, and what they do (searches,
 postings opened, Applied/Hide clicks, filters). It asks for a password (any username).
 
-- `functions/api/e.js` receives anonymous events from the page (a random id per
-  browser; no names, emails or IP addresses). `functions/admin/` is the portal.
+- `functions/api/e.js` receives visit and click events from the page (a random id per
+  browser, plus IP address, city and network; no names or emails). The site footer says
+  visits and IP addresses are logged. `functions/admin/` is the portal.
 - Events are stored in a free Cloudflare D1 database (`tracker-analytics`, created by
   the workflow). The Cloudflare token needs **Account / D1 / Edit** in addition to
   Cloudflare Pages / Edit. Events older than 13 months are deleted.

@@ -73,7 +73,7 @@ jobs:
           $W d1 execute tracker-analytics --remote --file=schema.sql || { rm wrangler.toml; exit 0; }
           # Add columns that newer versions of the portal record (harmless if they exist).
           have=$($W d1 execute tracker-analytics --remote --json --command "SELECT name FROM pragma_table_info('events')" 2>/dev/null || true)
-          for c in city region os net title screen lang; do
+          for c in city region os net title screen lang ip; do
             echo "$have" | grep -q "\"$c\"" || $W d1 execute tracker-analytics --remote --command "ALTER TABLE events ADD COLUMN $c TEXT" || true
           done
       - name: Publish to Cloudflare
