@@ -8,11 +8,12 @@ LinkedIn for new internships with the same searches as the desktop tracker
   python3 update.py PREVIOUS_URL OUT_DIR
 
 PREVIOUS_URL is where the live site serves its files (".../postings.json",
-".../seen.json" and ".../descriptions.json" are fetched from it). A 404 means this is the first run, so the
-check pages back through the last 90 days. OUT_DIR gets postings.json (what the
-page shows), seen.json (ids the title filter turned down, so later checks
-know they've been seen) and descriptions.json (job descriptions, fetched for
-postings from the last 30 days; the page loads it when a posting is opened).
+".../seen.json" and ".../d/NN.json" are fetched from it). A 404 means this is
+the first run, so the check pages back through the last 90 days. OUT_DIR gets
+postings.json (what the page shows), seen.json (ids the title filter turned
+down, so later checks know they've been seen) and d/00.json to d/99.json (job
+descriptions for postings from the last 30 days, split by the last two digits
+of the posting id so the page loads only the one it needs).
 """
 import html
 import json
@@ -46,21 +47,30 @@ DESC_WORKERS = 3
 LI_POSTING = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 
 
+def shard(pid):
+    return pid[-2:] if pid[-2:].isdigit() else "00"
+
+
+def get_json(base, name):
+    """A file the live site serves; {} if it isn't there. Any other failure
+    stops the run so a hiccup can't wipe the list."""
+    try:
+        with urllib.request.urlopen(f"{base.rstrip('/')}/{name}", timeout=30) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        return {}
+
+
 def get_previous(base):
-    """(postings, seen ids, first-run time) the site serves now; empty on the first run.
-    Any other failure stops the run so a hiccup can't wipe the list."""
-    out = []
-    for name in ("postings.json", "seen.json", "descriptions.json"):
-        try:
-            with urllib.request.urlopen(f"{base.rstrip('/')}/{name}", timeout=30) as r:
-                out.append(json.load(r))
-        except urllib.error.HTTPError as e:
-            if e.code != 404:
-                raise
-            out.append({})
-    posts, seen, descs = out
+    """(postings, seen ids, first-run time, descriptions) the site serves now; empty on the first run."""
+    posts, seen = get_json(base, "postings.json"), get_json(base, "seen.json")
+    descs = get_json(base, "descriptions.json").get("descriptions", {})  # the single file used before d/
+    for n in range(100):
+        descs.update(get_json(base, f"d/{n:02d}.json"))
     return ({p["id"]: p for p in posts.get("postings", [])}, seen.get("seen", {}),
-            posts.get("started_at"), descs.get("descriptions", {}))
+            posts.get("started_at"), descs)
 
 
 def description_text(page):
@@ -164,8 +174,13 @@ def main(base, out_dir):
                    "fields": tracker.FIELD_NAMES, "postings": rows}, f, separators=(",", ":"))
     with open(os.path.join(out_dir, "seen.json"), "w") as f:
         json.dump({"seen": seen}, f, separators=(",", ":"))
-    with open(os.path.join(out_dir, "descriptions.json"), "w") as f:
-        json.dump({"descriptions": descs}, f, separators=(",", ":"))
+    os.makedirs(os.path.join(out_dir, "d"), exist_ok=True)
+    shards = {f"{n:02d}": {} for n in range(100)}
+    for i, d in descs.items():
+        shards[shard(i)][i] = d
+    for n, part in shards.items():
+        with open(os.path.join(out_dir, "d", f"{n}.json"), "w") as f:
+            json.dump(part, f, separators=(",", ":"))
     print(f"{added} new posting(s) added; {len(rows)} on the site.")
 
 

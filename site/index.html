@@ -419,7 +419,7 @@ async function load(keepPage) {
   }
   if (loaded === j.checked_at) return;
   loaded = j.checked_at;
-  descs = null;  // fetched again the next time a posting is opened
+  descs = {};  // fetched again the next time a posting is opened
   FIELDS = j.fields;
   $("#field-list").innerHTML = "<option>All</option>" + FIELDS.map((f) => `<option>${esc(f)}</option>`).join("");
   data = j.postings; byId = new Map(data.map((p) => [p.id, p]));
@@ -486,9 +486,11 @@ addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY 
 addEventListener("storage", (e) => { if (e.key === "marks") { try { marks = JSON.parse(e.newValue); } catch (x) {} apply(); render(true); } });
 
 // ---- posting panel: description (saved for postings from the last 30 days) and the LinkedIn link
-let openId = null, descs = null;
-const loadDescs = () => (descs ||= fetch("descriptions.json", { cache: "no-cache" })
-  .then((r) => (r.ok ? r.json() : {})).then((j) => j.descriptions || {}).catch(() => { descs = null; return {}; }));
+// Descriptions are split into d/00.json to d/99.json by the id's last two digits.
+let openId = null, descs = {};
+const shardOf = (id) => (/\d\d$/.test(id) ? id.slice(-2) : "00");
+const loadDescs = (id) => { const k = shardOf(id); return (descs[k] ||= fetch(`d/${k}.json`, { cache: "no-cache" })
+  .then((r) => (r.ok ? r.json() : {})).catch(() => { delete descs[k]; return {}; })); };
 const fmtDay = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); return m ? new Date(+m[1], m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""; };
 function fillJob(p) {
   $("#job-title").textContent = p.title;
@@ -511,7 +513,7 @@ async function openJob(id) {
   track("open", p.field);
   setStatus([id], "seen", true);
   if (p.d) {
-    const text = (await loadDescs())[id];
+    const text = (await loadDescs(id))[id];
     if (openId !== id) return;
     desc.innerHTML = text ? `<div class="job-desc">${esc(text)}</div>` : none;
   }
