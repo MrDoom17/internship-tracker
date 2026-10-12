@@ -390,11 +390,13 @@ function saveMarks() { try { localStorage.setItem("marks", JSON.stringify(marks)
 function apply() {
   data.forEach((p) => { p.status = marks.s[p.id] || (p.found.slice(0, 19) > marks.since ? "new" : "seen"); });
 }
+const postingName = (p) => `${p.title} · ${p.company}`;
 async function setStatus(ids, status, onlyNew) {
   if (!onlyNew) {  // usage count per field, e.g. 3 Finance postings marked Applied
     const byField = {};
     ids.forEach((id) => { const p = byId.get(id); if (p && p.status !== status) byField[p.field] = (byField[p.field] || 0) + 1; });
-    for (const f in byField) track(status === "seen" ? "restore" : status, f, byField[f]);
+    const one = ids.length === 1 ? byId.get(ids[0]) : null;  // a single posting: note which one
+    for (const f in byField) track(status === "seen" ? "restore" : status, f, byField[f], one && postingName(one));
   }
   ids.forEach((id) => {
     const p = byId.get(id);
@@ -438,7 +440,7 @@ $("#list").addEventListener("click", (e) => {
   const id = row.dataset.id, btn = e.target.closest("button[data-do]");
   if (btn) return setStatus([id], btn.dataset.do);
   const multi = e.ctrlKey || e.metaKey || e.shiftKey;
-  if (e.target.closest("a") && multi) { track("open", byId.get(id)?.field); return setStatus([id], "seen", true); }  // a new tab, as usual
+  if (e.target.closest("a") && multi) { const p = byId.get(id); track("linkedin", p?.field, 0, p && postingName(p)); return setStatus([id], "seen", true); }  // a new tab, as usual
   e.preventDefault();
   if (multi || selected.size) {  // selecting several for the bar at the bottom
     selected.has(id) ? selected.delete(id) : selected.add(id);
@@ -450,7 +452,7 @@ $("#bulk").addEventListener("click", (e) => {
   const act = e.target.closest("button")?.dataset.act; if (!act) return;
   const ids = [...selected];
   if (act === "open") {
-    ids.slice(0, 10).forEach((id) => { const p = data.find((x) => x.id === id); if (p) { window.open(p.url, "_blank", "noopener"); track("open", p.field); } });
+    ids.slice(0, 10).forEach((id) => { const p = data.find((x) => x.id === id); if (p) { window.open(p.url, "_blank", "noopener"); track("linkedin", p.field, 0, postingName(p)); } });
     setStatus(ids, "seen", true);
   } else if (act !== "clear") setStatus(ids, act);
   selected.clear(); render(true);
@@ -476,8 +478,8 @@ $("#reset").addEventListener("click", () => {
   FILTERS.forEach((id) => { $("#" + id).value = id === "sort" ? "posted" : ""; });
   saveFilters(); render();
 });
-$("#more-btn").addEventListener("click", () => { shown += PAGE_SIZE * 2; render(true); });
-$("#seen-all").addEventListener("click", () => { marks.since = latest; saveMarks(); apply(); render(true); });
+$("#more-btn").addEventListener("click", () => { shown += PAGE_SIZE * 2; render(true); track("more", "", shown); });
+$("#seen-all").addEventListener("click", () => { marks.since = latest; saveMarks(); apply(); render(true); track("markall"); });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $("#q").focus(); }
@@ -510,7 +512,7 @@ async function openJob(id) {
   desc.innerHTML = p.d ? `<div class="job-none">Loading the description…</div>` : none;
   $("#job").classList.add("show"); $("#job").setAttribute("aria-hidden", "false"); $("#scrim").classList.add("show");
   $("#job .job-body").scrollTop = 0;
-  track("open", p.field);
+  track("open", p.field, 0, postingName(p));
   setStatus([id], "seen", true);
   if (p.d) {
     const text = (await loadDescs(id))[id];
@@ -526,6 +528,7 @@ function closeJob() {
 $("#job-close").addEventListener("click", closeJob);
 $("#scrim").addEventListener("click", closeJob);
 $("#job-acts").addEventListener("click", (e) => {
+  if (e.target.closest("#job-link") && openId) { const p = byId.get(openId); track("linkedin", p.field, 0, postingName(p)); }
   const b = e.target.closest("button[data-do]"); if (b && openId) setStatus([openId], b.dataset.do);
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeJob(); });
@@ -556,8 +559,8 @@ const track = (() => {
     if (document.hidden && shownAt) { send([{ t: "leave", n: Math.round((Date.now() - shownAt) / 1000) }]); shownAt = 0; }
     else if (!document.hidden) shownAt = Date.now();
   });
-  send([{ t: "view", ref: document.referrer }]);
-  return (t, d, n) => send([{ t, d, n }]);
+  send([{ t: "view", ref: document.referrer, sc: `${screen.width}x${screen.height}`, lang: navigator.language }]);
+  return (t, d, n, x) => send([{ t, d, n, x }]);
 })();
 let searchTimer;
 $("#q").addEventListener("input", () => {

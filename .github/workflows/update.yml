@@ -70,7 +70,12 @@ jobs:
           if [ -z "$id" ]; then $W d1 create tracker-analytics && id=$(find_db); fi
           if [ -z "$id" ]; then echo "::warning::No D1 database: add Account / D1 / Edit to the Cloudflare token"; exit 0; fi
           printf 'name = "%s"\npages_build_output_dir = "site"\ncompatibility_date = "2024-09-23"\n\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "tracker-analytics"\ndatabase_id = "%s"\n' "$SITE_NAME" "$id" > wrangler.toml
-          $W d1 execute tracker-analytics --remote --file=schema.sql || rm wrangler.toml
+          $W d1 execute tracker-analytics --remote --file=schema.sql || { rm wrangler.toml; exit 0; }
+          # Add columns that newer versions of the portal record (harmless if they exist).
+          have=$($W d1 execute tracker-analytics --remote --json --command "SELECT name FROM pragma_table_info('events')" 2>/dev/null || true)
+          for c in city region os net title screen lang; do
+            echo "$have" | grep -q "\"$c\"" || $W d1 execute tracker-analytics --remote --command "ALTER TABLE events ADD COLUMN $c TEXT" || true
+          done
       - name: Publish to Cloudflare
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx --yes wrangler@3.114.17 pages deploy site --project-name="$SITE_NAME" --branch=main --commit-dirty=true

@@ -80,6 +80,41 @@ th { color: var(--muted); font-weight: 500; border-top: 0; }
 details summary { cursor: pointer; color: var(--text2); font-size: 13px; margin-top: 8px; }
 .setup { max-width: 640px; }
 .setup ol { padding-left: 20px; } .setup li { margin: 6px 0; }
+.full { margin-top: 12px; }
+.vt { width: 100%; font-size: 13px; }
+.vt-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.vt th, .vt td { text-align: left; white-space: nowrap; padding: 7px 10px 7px 0; vertical-align: top; }
+.vt td.num, .vt th.num { text-align: right; }
+.vt tbody tr { cursor: pointer; }
+.vt tbody tr:hover td { background: var(--grid); }
+.vt .who { font-weight: 600; }
+.vt .sub { color: var(--muted); font-size: 12px; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--accent-soft); color: var(--text); margin-left: 6px; font-weight: 500; }
+.tag.new { background: color-mix(in srgb, var(--good) 22%, transparent); }
+.feed li { cursor: pointer; }
+.feed li:hover { background: var(--grid); }
+.feed .who { color: var(--accent); font-weight: 600; margin-right: 4px; }
+.feed .post { color: var(--text2); }
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .35); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5; }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--card); border-left: 1px solid var(--line);
+  transform: translateX(100%); transition: transform .2s; z-index: 6; display: flex; flex-direction: column; }
+.drawer.show { transform: none; }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.drawer-head h2 { font-size: 18px; margin: 0; flex: 1; }
+.drawer-head button { border: 1px solid var(--line); background: none; color: var(--text); border-radius: 8px; font: inherit; padding: 4px 10px; cursor: pointer; }
+.drawer-body { overflow: auto; padding: 16px 18px 40px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin-bottom: 18px; }
+.facts div { min-width: 0; }
+.facts .l { color: var(--muted); font-size: 12px; }
+.facts .v { overflow-wrap: anywhere; }
+.visit { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.visit h3 { font-size: 14px; margin: 0 0 6px; }
+.visit h3 span { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.steps { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--accent-soft); }
+.steps li { display: flex; gap: 10px; padding: 3px 0; font-size: 13px; }
+.steps .t { color: var(--muted); min-width: 64px; font-variant-numeric: tabular-nums; }
+.steps .post { color: var(--text2); }
 footer { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
 footer label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 </style>
@@ -102,6 +137,8 @@ footer label { display: inline-flex; gap: 6px; align-items: center; cursor: poin
   </footer>
 </div>
 <div class="tip" id="tip"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Visitor details"><div class="drawer-head"><h2 id="d-title">Visitor</h2><button id="d-close" type="button">Close</button></div><div class="drawer-body" id="d-body"></div></aside>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -189,18 +226,83 @@ function list(rows, { label = (k) => k || "–", unit = "people", total, extra }
 }
 
 const ACTION = {
-  view: "opened the site", search: "searched", applied: "marked Applied", hidden: "hid", restore: "restored",
-  open: "opened a posting", field: "filtered by field", place: "filtered by location",
+  view: "opened the site", search: "searched", applied: "marked Applied", hidden: "hid", restore: "undid a mark on",
+  open: "viewed", linkedin: "opened on LinkedIn", field: "filtered by field", place: "filtered by location",
+  more: "loaded more postings", markall: "marked all as seen", leave: "left",
 };
-function feedLine(e) {
-  const t = new Date(e.ts), today = new Date().toDateString() === t.toDateString();
-  const when = today ? t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : t.toLocaleDateString([], { month: "short", day: "numeric" });
-  let what = ACTION[e.type] || e.type;
-  if (e.detail) what += e.type === "search" ? ` “${e.detail}”` : ` · ${e.detail}`;
-  if (e.n > 1 && (e.type === "applied" || e.type === "hidden")) what += ` (${e.n} postings)`;
-  if (e.type === "view") what += e.ret ? " · returning" : " · first visit";
-  return `<li><span class="t">${esc(when)}</span><span class="w">${esc(what)}</span><span class="m">${esc(e.device || "")}${e.country ? " · " + esc(flag(e.country) + e.country) : ""}</span></li>`;
+const where = (e) => [e.city, e.region && e.region !== e.city ? e.region : "", e.country && e.country !== "XX" ? flag(e.country) + e.country : ""].filter(Boolean).join(", ");
+const devName = (e) => [e.device === "Computer" ? e.os : e.device === "Phone" && e.os === "iOS" ? "iPhone" : e.device === "Tablet" && e.os === "iOS" ? "iPad" : [e.os, e.device].filter(Boolean).join(" "), e.browser].filter(Boolean).join(" · ");
+const refName = (r) => r || "Direct / text message";
+const when = (ts) => { const t = new Date(ts), today = new Date().toDateString() === t.toDateString();
+  return today ? t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : t.toLocaleDateString([], { month: "short", day: "numeric" }) + ", " + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); };
+const fullWhen = (ts) => new Date(ts).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+// What one click was, in words: "searched “goldman”", "viewed Analyst Intern · Acme"
+function actionText(e) {
+  let what = ACTION[e.type] || e.type, post = "";
+  if (e.type === "search") what += ` “${e.detail}”`;
+  else if (e.type === "leave") what += ` after ${dur(e.n)} on the page`;
+  else if (e.type === "view") what += (e.ref ? ` from ${e.ref}` : "") + (e.ret ? "" : " for the first time");
+  else if (e.type === "field" || e.type === "place") what += ` “${e.detail}”`;
+  else if (["open", "linkedin", "applied", "hidden", "restore"].includes(e.type)) {
+    if (e.title) post = e.title;
+    else post = (e.n > 1 ? `${e.n} postings` : "a posting") + (e.detail ? ` (${e.detail})` : "");
+  }
+  return `${esc(what)}${post ? ` <span class="post">${esc(post)}</span>` : ""}`;
 }
+function feedLine(e) {
+  return `<li data-v="${esc(e.vid)}"><span class="t">${esc(when(e.ts))}</span><span class="w"><span class="who">#${e.num}</span>${actionText(e)}</span>` +
+    `<span class="m">${esc([e.city || (e.country ? flag(e.country) + e.country : ""), e.device].filter(Boolean).join(" · "))}</span></li>`;
+}
+
+function visitorTable(rows) {
+  if (!rows.length) return `<div class="empty">Nobody yet.</div>`;
+  const did = (v) => [[v.searches, "search", "searches"], [v.opens, "posting viewed", "postings viewed"], [v.linkedin, "LinkedIn open", "LinkedIn opens"],
+    [v.applied, "applied", "applied"], [v.hidden, "hidden", "hidden"]].filter(([n]) => n > 0).map(([n, a, b]) => `${fmt(n)} ${n === 1 ? a : b}`).join(" · ") || "Just looked";
+  return `<div class="vt-wrap"><table class="vt"><thead><tr><th>Visitor</th><th>Where</th><th>Device</th><th>First came from</th>
+    <th>Last seen</th><th class="num">Visits</th><th class="num">Time</th><th>What they did</th></tr></thead><tbody>` +
+    rows.map((v) => `<tr data-v="${esc(v.vid)}"><td><span class="who">#${v.num}</span>${v.visitsAll > 1 ? `<span class="tag">returning</span>` : `<span class="tag new">new</span>`}
+      <div class="sub">since ${esc(new Date(v.first).toLocaleDateString([], { month: "short", day: "numeric" }))}</div></td>
+      <td>${esc(where(v) || "Unknown")}${v.net ? `<div class="sub">${esc(v.net)}</div>` : ""}</td>
+      <td>${esc(devName(v))}${v.screen ? `<div class="sub">${esc(v.screen)}${v.lang ? " · " + esc(v.lang) : ""}</div>` : ""}</td>
+      <td>${esc(refName(v.firstRef))}</td><td>${esc(when(v.last))}</td>
+      <td class="num">${fmt(v.visits)}${v.visitsAll > v.visits ? `<div class="sub">${fmt(v.visitsAll)} all time</div>` : ""}</td>
+      <td class="num">${dur(v.secs)}</td><td>${esc(did(v))}</td></tr>`).join("") + `</tbody></table></div>`;
+}
+
+// ---- one visitor's timeline, in a panel on the right
+async function openVisitor(vid) {
+  $("#drawer").classList.add("show"); $("#scrim").classList.add("show");
+  $("#d-title").textContent = "Visitor"; $("#d-body").innerHTML = `<div class="empty">Loading…</div>`;
+  let d;
+  try { d = await (await fetch(`/admin/visitor?v=${encodeURIComponent(vid)}`, { cache: "no-store" })).json(); }
+  catch (e) { $("#d-body").innerHTML = `<div class="empty">Couldn't load this visitor.</div>`; return; }
+  const p = d.profile;
+  if (!p) { $("#d-body").innerHTML = `<div class="empty">No record of this visitor.</div>`; return; }
+  $("#d-title").textContent = `Visitor #${p.num}`;
+  const fact = (l, v) => v ? `<div><div class="l">${l}</div><div class="v">${esc(v)}</div></div>` : "";
+  const visits = [];
+  d.events.forEach((e) => { let v = visits.find((x) => x.sid === e.sid); if (!v) visits.push(v = { sid: e.sid, ev: [] }); v.ev.push(e); });
+  visits.sort((a, b) => b.ev[0].ts - a.ev[0].ts);
+  const total = visits.length;
+  $("#d-body").innerHTML = `<div class="facts">
+      ${fact("Where", where(p) || "Unknown")}${fact("Network", p.net)}${fact("Device", devName(p))}
+      ${fact("Screen", p.screen)}${fact("Language", p.lang)}${fact("First came from", refName(p.firstRef))}
+      ${fact("First seen", fullWhen(p.first))}${fact("Last seen", fullWhen(p.last))}
+      ${fact("Visits", fmt(p.visitsAll))}${fact("Total time on the page", dur(p.secs))}
+    </div>` +
+    visits.map((v, i) => {
+      const start = v.ev[0], secs = v.ev.filter((e) => e.type === "leave").reduce((a, e) => a + e.n, 0);
+      const steps = v.ev.filter((e) => !(e.type === "leave" && e.n < 5));
+      return `<div class="visit"><h3>Visit ${total - i}<span>${esc(fullWhen(start.ts))}${secs ? " · " + dur(secs) : ""}${start.city ? " · " + esc(start.city) : ""} · ${esc(start.device || "")}</span></h3>
+        <ul class="steps">${steps.map((e) => `<li><span class="t">${esc(new Date(e.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span><span>${actionText(e)}</span></li>`).join("")}</ul></div>`;
+    }).join("");
+}
+function closeVisitor() { $("#drawer").classList.remove("show"); $("#scrim").classList.remove("show"); }
+document.addEventListener("click", (e) => {
+  const row = e.target.closest("[data-v]"); if (row) return openVisitor(row.dataset.v);
+  if (e.target.closest("#d-close") || e.target.id === "scrim") closeVisitor();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeVisitor(); });
 
 function render(d, since) {
   const t = d.totals, A = Object.fromEntries(d.actions.map((a) => [a.k, a]));
@@ -241,19 +343,27 @@ function render(d, since) {
           return `<div class="kpi"><div class="l">${l}</div><div class="v">${fmt(n)}</div><div class="s">by ${fmt(a.p)} ${a.p === 1 ? "person" : "people"}</div></div>`; }).join("")}
       </div>
       ${days === 1 ? "" : `<h2 style="margin-top:16px">Busiest hours</h2><p class="hint">Visits by time of day, your time.</p>${bars(hours, { height: 150, labelEvery: 48 })}`}</div>
-    <div class="card"><h2>Recent activity</h2><p class="hint">Latest clicks, newest first. No names, just device and country.</p>
+    <div class="card"><h2>Recent activity</h2><p class="hint">Latest clicks, newest first. Click one to see everything that visitor did.</p>
       ${d.recent.length ? `<ul class="feed">${d.recent.map(feedLine).join("")}</ul>` : `<div class="empty">Nothing yet.</div>`}</div>
   </section>
 
   <section class="grid two">
     <div class="card"><h2>Where visitors came from</h2><p class="hint">“Direct” is a typed or texted link, which hides the source.</p>
       ${list(d.refs, { label: (k) => k || "Direct / text message", total: t.visitors })}</div>
-    <div class="card"><h2>Countries</h2><p class="hint">Visitors by country.</p>${list(d.countries, { label: country, total: t.visitors })}</div>
+    <div class="card"><h2>Cities</h2><p class="hint">Visitors by city (approximate, from their network).</p>${list(d.cities, { label: (k) => k, total: t.visitors })}
+      <h2 style="margin-top:14px">Countries</h2>${list(d.countries, { label: country, total: t.visitors })}</div>
     <div class="card"><h2>Devices</h2><p class="hint">Visitors by device.</p>${list(d.devices, { total: t.visitors })}
       <h2 style="margin-top:14px">Browsers</h2>${list(d.browsers, { total: t.visitors })}</div>
   </section>
 
+  <section class="card full"><h2>Visitors</h2>
+    <p class="hint">Each person who visited ${label}, most recent first. Numbers are given in the order people first showed up. Click a row for their full timeline.</p>
+    ${visitorTable(d.visitors)}
+  </section>
+
   <section class="grid two">
+    <div class="card"><h2>Most viewed postings</h2><p class="hint">Postings people opened on the site or on LinkedIn. People, then total opens.</p>
+      ${list(d.postings.map((r) => ({ ...r, n: r.p, total: r.n })), { label: (k) => k, extra: (r) => `${fmt(r.total)} opens` })}</div>
     <div class="card"><h2>What people search for</h2><p class="hint">Words typed in the search box. Times searched, then people.</p>
       ${list(d.searches, { label: (k) => `“${k}”`, extra: (r) => `${r.p} ${r.p === 1 ? "person" : "people"}` })}</div>
     <div class="card"><h2>Fields people apply to</h2><p class="hint">Field of each posting marked Applied.</p>
