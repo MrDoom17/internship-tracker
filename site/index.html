@@ -267,7 +267,7 @@ const SHOW = ["Active", "New only", "Applied", "Hidden", "Everything"];
 const PAGE_SIZE = 150;
 let data = [], selected = new Set(), shown = PAGE_SIZE;
 
-$("#field-list").innerHTML = FIELDS.map((f) => `<option>${f.replace(/&/g, "&amp;")}</option>`).join("");
+$("#field-list").innerHTML = "<option>All</option>" + FIELDS.map((f) => `<option>${f.replace(/&/g, "&amp;")}</option>`).join("");
 
 // Remember filters between visits (a convenience only; the page works without it).
 const FILTERS = ["q", "field", "place", "show", "sort"];
@@ -286,10 +286,14 @@ function parseQuery(q) {
   }
   return { want, skip };
 }
-const want = (id) => { const t = $("#" + id).value.replace(/\s*\(\d+\)$/, "").trim().toLowerCase(); return t === "all" ? "" : t; };
+// A dropdown box is cleared while it has focus so its list shows every choice
+// (a browser only lists choices matching what's typed); until something new
+// is picked, the previous choice still applies.
+const val = (id) => { const el = $("#" + id); return el.value || (el === document.activeElement ? el.dataset.prev || "" : ""); };
+const want = (id) => { const t = val(id).replace(/\s*\(\d+\)$/, "").trim().toLowerCase(); return t === "all" ? "" : t; };
 function showMode() {
   const t = want("show");
-  if (!t) return $("#show").value.trim().toLowerCase() === "all" ? "Everything" : "Active";
+  if (!t) return val("show").trim().toLowerCase() === "all" ? "Everything" : "Active";
   return SHOW.find((o) => o.toLowerCase().startsWith(t)) || "Active";
 }
 function ago(d, found) {
@@ -356,7 +360,7 @@ function render(keepPage) {
   data.forEach((p) => { if (p.status !== "hidden") { counts[p.place] = (counts[p.place] || 0) + 1; fields[p.field] = (fields[p.field] || 0) + 1; active++; } });
   const order = Object.keys(counts).sort((a, b) =>
     (a !== "Remote") - (b !== "Remote") || (a === "Nationwide / other") - (b === "Nationwide / other") || a.localeCompare(b));
-  $("#place-list").innerHTML = order.map((k) => `<option value="${esc(k)} (${counts[k]})"></option>`).join("");
+  $("#place-list").innerHTML = "<option>All</option>" + order.map((k) => `<option value="${esc(k)} (${counts[k]})"></option>`).join("");
 
   const cur = want("field");
   $("#chips").innerHTML = `<button class="chip${cur ? "" : " on"}" data-f="">All <span class="n">${active.toLocaleString()}</span></button>` +
@@ -417,7 +421,7 @@ async function load(keepPage) {
   loaded = j.checked_at;
   descs = null;  // fetched again the next time a posting is opened
   FIELDS = j.fields;
-  $("#field-list").innerHTML = FIELDS.map((f) => `<option>${esc(f)}</option>`).join("");
+  $("#field-list").innerHTML = "<option>All</option>" + FIELDS.map((f) => `<option>${esc(f)}</option>`).join("");
   data = j.postings; byId = new Map(data.map((p) => [p.id, p]));
   latest = data.reduce((m, p) => (p.found.slice(0, 19) > m ? p.found.slice(0, 19) : m), "");
   if (!marks.since) {  // first visit: the last day's finds start out as new (not the first run's backlog)
@@ -459,7 +463,14 @@ $("#chips").addEventListener("click", (e) => {
 FILTERS.forEach((id) => {
   const el = $("#" + id);
   el.addEventListener(id === "sort" ? "change" : "input", () => { saveFilters(); render(); });
-  if (id !== "sort" && id !== "q") el.addEventListener("focus", () => el.select());
+  if (id !== "sort" && id !== "q") {
+    const hint = el.placeholder;
+    el.addEventListener("focus", () => { el.dataset.prev = el.value; el.placeholder = el.value || hint; el.value = ""; });
+    el.addEventListener("blur", () => {
+      if (!el.value && el.dataset.prev) el.value = el.dataset.prev;  // nothing new picked: keep the old choice
+      el.dataset.prev = ""; el.placeholder = hint;
+    });
+  }
 });
 $("#reset").addEventListener("click", () => {
   FILTERS.forEach((id) => { $("#" + id).value = id === "sort" ? "posted" : ""; });
