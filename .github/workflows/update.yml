@@ -7,7 +7,9 @@ name: Check LinkedIn
 
 on:
   schedule:
-    - cron: "17 * * * *"   # every hour
+    # Twice an hour: GitHub often skips scheduled runs when it's busy, so
+    # asking more often keeps the list close to hourly.
+    - cron: "17,47 * * * *"
   workflow_dispatch:        # "Run workflow" button on the Actions tab
   push:
     branches: [main]

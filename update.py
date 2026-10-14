@@ -51,16 +51,24 @@ def shard(pid):
     return pid[-2:] if pid[-2:].isdigit() else "00"
 
 
-def get_json(base, name):
-    """A file the live site serves; {} if it isn't there. Any other failure
-    stops the run so a hiccup can't wipe the list."""
-    try:
-        with urllib.request.urlopen(f"{base.rstrip('/')}/{name}", timeout=30) as r:
-            return json.load(r)
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
-        return {}
+def get_json(base, name, tries=5):
+    """A file the live site serves; {} if it isn't there. A brief outage
+    (5xx, dropped connection) is retried; if it lasts, the run stops so a
+    hiccup can't wipe the list."""
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(f"{base.rstrip('/')}/{name}", timeout=30) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return {}
+            if e.code < 500 or attempt == tries - 1:
+                raise
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            if attempt == tries - 1:
+                raise
+        print(f"  {name}: the site didn't answer, trying again...")
+        time.sleep(10 * (attempt + 1))
 
 
 def get_previous(base):
